@@ -17,7 +17,9 @@ import { ProductSummary } from "../types";
 import { toast } from "sonner";
 import logoImage from "../../assets/logo.png";
 import foxHeadImage from "../../assets/logo-fox-head.png";
-import FeedbackState from "../components/FeedbackState";
+import EmptyState from "../components/ui/state/EmptyState";
+import ErrorState from "../components/ui/state/ErrorState";
+import LoadingState from "../components/ui/state/LoadingState";
 
 const categories = ["전체", "디지털기기", "생활가전", "가구/인테리어", "패션", "도서", "스포츠/레저", "기타"];
 
@@ -36,19 +38,6 @@ const STATUS_BADGE: Record<string, { label: string; color: string }> = {
   RESERVED: { label: "예약중", color: "bg-amber-400 text-white" },
   SOLD_OUT: { label: "판매완료", color: "bg-stone-300 text-stone-600" },
 };
-
-function SkeletonCard() {
-  return (
-    <div className="overflow-hidden rounded-[1.6rem] border border-orange-100 bg-white">
-      <div className="skeleton aspect-[0.95]" />
-      <div className="space-y-3 p-4">
-        <div className="skeleton h-4 w-1/2" />
-        <div className="skeleton h-6 w-4/5" />
-        <div className="skeleton h-4 w-2/5" />
-      </div>
-    </div>
-  );
-}
 
 function ProductCard({
   product,
@@ -507,14 +496,17 @@ export default function HomePage() {
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-            {Array.from({ length: 8 }).map((_, index) => (
-              <SkeletonCard key={index} />
-            ))}
-          </div>
+          <LoadingState
+            mascotImage={foxHeadImage}
+            description={
+              searchMode && keyword.trim()
+                ? `"${keyword}"와 어울리는 상품을 모아보고 있어요.`
+                : "여우가 마음에 드는 상품을 고르고 있어요."
+            }
+          />
         ) : errorMessage ? (
-          <FeedbackState
-            variant="error"
+          <ErrorState
+            mascotImage={foxHeadImage}
             title="화면을 준비하지 못했어요"
             description={errorMessage}
             actionLabel={searchMode ? "검색 다시 시도" : "목록 다시 불러오기"}
@@ -527,7 +519,8 @@ export default function HomePage() {
             }}
           />
         ) : displayProducts.length === 0 ? (
-          <FeedbackState
+          <EmptyState
+            mascotImage={foxHeadImage}
             title={searchMode ? "검색 결과가 없어요" : "아직 등록된 상품이 없어요"}
             description={
               searchMode
