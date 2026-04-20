@@ -1,21 +1,48 @@
-import { useState, useEffect } from "react";
-import { ArrowLeft, Heart, ChevronLeft, ChevronRight, User } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Heart,
+  House,
+  MessageCircle,
+  PackageSearch,
+  PencilLine,
+  Star,
+  User,
+} from "lucide-react";
 import { useNavigate, useParams } from "react-router";
+import { toast } from "sonner";
+import { chatApi } from "../api/chat";
+import { membersApi } from "../api/members";
+import { productsApi } from "../api/products";
+import { ProductDetail, PublicMember } from "../types";
 import { Button } from "../components/ui/button";
-import { Badge } from "../components/ui/badge";
 import { useAuth } from "../contexts/AuthContext";
 import { useChatContext } from "../contexts/ChatContext";
-import { toast } from "sonner";
-import { productsApi } from "../api/products";
-import { membersApi } from "../api/members";
-import { chatApi } from "../api/chat";
-import { ProductDetail, PublicMember } from "../types";
 
-const STATUS_MAP: Record<string, { label: string; className: string }> = {
-  SALE:     { label: "판매중",   className: "bg-[var(--getchu-orange)]" },
-  RESERVED: { label: "예약중",   className: "bg-amber-500" },
-  SOLD_OUT: { label: "판매완료", className: "bg-gray-400" },
+const STATUS_MAP: Record<string, { label: string; badgeClass: string }> = {
+  SALE: {
+    label: "판매중",
+    badgeClass: "bg-orange-100 text-[var(--getchu-orange-strong)]",
+  },
+  RESERVED: {
+    label: "예약중",
+    badgeClass: "bg-amber-100 text-amber-700",
+  },
+  SOLD_OUT: {
+    label: "판매완료",
+    badgeClass: "bg-gray-200 text-gray-700",
+  },
 };
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
 
 export default function ProductDetailPage() {
   const navigate = useNavigate();
@@ -30,236 +57,321 @@ export default function ProductDetailPage() {
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id) {
+      return;
+    }
+
     setLoading(true);
-    productsApi.getProduct(Number(id))
+    setCurrentImage(0);
+
+    productsApi
+      .getProduct(Number(id))
       .then((data) => {
         setProduct(data);
         return membersApi.getMember(data.sellerId);
       })
       .then((sellerData) => setSeller(sellerData))
-      .catch(() => { toast.error("상품을 찾을 수 없습니다"); navigate("/"); })
+      .catch(() => {
+        toast.error("상품을 찾을 수 없어요.");
+        navigate("/");
+      })
       .finally(() => setLoading(false));
   }, [id, navigate]);
 
   if (loading || !product) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-400">불러오는 중...</p>
+      <div className="flex min-h-screen items-center justify-center bg-[var(--getchu-cream)]/55 px-4">
+        <div className="surface-panel w-full max-w-md px-6 py-12 text-center">
+          <p className="text-sm font-medium text-gray-500">상품 정보를 불러오고 있어요.</p>
+        </div>
       </div>
     );
   }
 
   const isOwner = user?.id === product.sellerId;
   const statusInfo = STATUS_MAP[product.status] ?? STATUS_MAP.SALE;
-  const images = product.imageUrls;
+  const images = product.imageUrls ?? [];
 
   const handleLike = async () => {
-    if (!isAuthenticated) { navigate("/login"); return; }
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+
     try {
       if (isLiked) {
         await productsApi.deleteLike(product.id);
         setIsLiked(false);
-        toast.success("찜 취소되었습니다");
+        toast.success("찜을 취소했어요.");
       } else {
         await productsApi.createLike(product.id);
         setIsLiked(true);
-        toast.success("찜했습니다");
+        toast.success("찜했어요.");
       }
     } catch {
-      toast.error("처리 중 오류가 발생했습니다");
+      toast.error("찜 처리 중 문제가 생겼어요.");
     }
   };
 
   const handleReserve = async () => {
-    if (!isAuthenticated) { navigate("/login"); return; }
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+
     setActionLoading(true);
     try {
       const result = await productsApi.reserveProduct(product.id);
       setProduct({ ...product, status: "RESERVED" });
-      toast.success(`예약되었습니다! (판매자: ${result.sellerNickname})`);
+      toast.success(`예약했어요. 판매자는 ${result.sellerNickname}님이에요.`);
     } catch {
-      toast.error("이미 예약된 상품이거나 예약에 실패했습니다");
+      toast.error("예약할 수 없는 상품이에요.");
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleChat = async () => {
-    if (!isAuthenticated) { navigate("/login"); return; }
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+
     setActionLoading(true);
     try {
-      // TODO: 백엔드 Product 도메인 담당자가 ChatRoomService에서 productId로 sellerId를 자동 조회하도록
-      //       수정 완료되면 → chatApi.createChatRoom(product.id) 로 변경 (sellerId 인자 제거)
       const { chatRoomId } = await chatApi.createChatRoom(product.id, product.sellerId);
       await refreshChatRooms();
       navigate(`/chat/${chatRoomId}`);
     } catch (err: any) {
       console.error("채팅방 생성 실패:", err?.response?.status, err?.response?.data, err?.message);
-      toast.error("채팅방 생성에 실패했습니다");
+      toast.error("채팅방을 만들지 못했어요.");
     } finally {
       setActionLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* 헤더 */}
-      <header className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-3">
-        <div className="max-w-5xl mx-auto flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
-          </button>
-          <span className="text-sm text-gray-500 truncate">{product.title}</span>
+    <div className="min-h-screen bg-[var(--getchu-cream)]/55 pb-24">
+      <header className="border-b border-[var(--getchu-border)] bg-white/90 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--getchu-border)] bg-white text-gray-700 transition hover:-translate-y-0.5 hover:border-[var(--getchu-orange)] hover:text-[var(--getchu-orange-strong)]"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--getchu-orange)]">
+                Product Detail
+              </p>
+              <h1 className="truncate text-xl font-semibold text-gray-900">{product.title}</h1>
+            </div>
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate("/")}
+            className="gap-2 border-orange-200 bg-white text-[var(--getchu-orange-strong)]"
+          >
+            <House className="h-4 w-4" />
+            홈
+          </Button>
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-
-          {/* 왼쪽: 이미지 */}
-          <div>
-            <div className="relative bg-white rounded-2xl overflow-hidden border border-gray-200 aspect-square">
-              {images.length > 0 ? (
-                <img
-                  src={images[currentImage]}
-                  alt={product.title}
-                  className="w-full h-full object-contain"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-300 text-lg">
-                  이미지 없음
-                </div>
-              )}
-              {images.length > 1 && (
-                <>
-                  <button
-                    onClick={() => setCurrentImage((prev) => (prev - 1 + images.length) % images.length)}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-1.5 shadow transition"
-                  >
-                    <ChevronLeft className="w-5 h-5 text-gray-700" />
-                  </button>
-                  <button
-                    onClick={() => setCurrentImage((prev) => (prev + 1) % images.length)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-1.5 shadow transition"
-                  >
-                    <ChevronRight className="w-5 h-5 text-gray-700" />
-                  </button>
-                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-                    {images.map((_, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setCurrentImage(idx)}
-                        className={`w-2 h-2 rounded-full transition-colors ${idx === currentImage ? "bg-[var(--getchu-orange)]" : "bg-gray-300"}`}
-                      />
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* 썸네일 */}
-            {images.length > 1 && (
-              <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
-                {images.map((url, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setCurrentImage(idx)}
-                    className={`w-16 h-16 shrink-0 rounded-lg overflow-hidden border-2 transition-colors ${idx === currentImage ? "border-[var(--getchu-orange)]" : "border-transparent"}`}
-                  >
-                    <img src={url} alt="" className="w-full h-full object-cover" />
-                  </button>
-                ))}
+      <main className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-6 sm:px-6 lg:py-8 xl:grid-cols-[minmax(0,1.08fr)_minmax(340px,0.92fr)]">
+        <section className="surface-panel overflow-hidden p-4 sm:p-5">
+          <div className="relative aspect-square overflow-hidden rounded-[28px] bg-[linear-gradient(180deg,#fff8f0,#fff2e2)]">
+            {images.length > 0 ? (
+              <img
+                src={images[currentImage]}
+                alt={product.title}
+                className="h-full w-full object-contain p-5 sm:p-8"
+              />
+            ) : (
+              <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-[var(--getchu-orange-strong)]/70">
+                <PackageSearch className="h-10 w-10" />
+                <p className="text-sm font-medium">등록된 이미지가 없어요.</p>
               </div>
             )}
+
+            {images.length > 1 ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setCurrentImage((prev) => (prev - 1 + images.length) % images.length)}
+                  className="btn-interactive absolute left-4 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-orange-100 bg-white/92 text-gray-700 shadow-sm"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentImage((prev) => (prev + 1) % images.length)}
+                  className="btn-interactive absolute right-4 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-orange-100 bg-white/92 text-gray-700 shadow-sm"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+                <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-white/88 px-3 py-2 shadow-sm backdrop-blur">
+                  {images.map((_, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => setCurrentImage(index)}
+                      className={`h-2.5 rounded-full transition-all ${
+                        index === currentImage ? "w-6 bg-[var(--getchu-orange)]" : "w-2.5 bg-orange-200"
+                      }`}
+                    />
+                  ))}
+                </div>
+              </>
+            ) : null}
           </div>
 
-          {/* 오른쪽: 상품 정보 */}
-          <div className="flex flex-col gap-6">
-            {/* 상태 + 카테고리 */}
-            <div className="flex items-center gap-2">
-              <Badge className={`${statusInfo.className} text-white text-xs px-2.5 py-1`}>
+          {images.length > 1 ? (
+            <div className="mt-4 grid grid-cols-4 gap-3 sm:grid-cols-5">
+              {images.map((url, index) => (
+                <button
+                  key={`${url}-${index}`}
+                  type="button"
+                  onClick={() => setCurrentImage(index)}
+                  className={`overflow-hidden rounded-[20px] border bg-white transition ${
+                    index === currentImage
+                      ? "border-[var(--getchu-orange)] shadow-[0_12px_28px_rgba(249,115,22,0.16)]"
+                      : "border-[var(--getchu-border)] hover:border-orange-200"
+                  }`}
+                >
+                  <img src={url} alt="" className="aspect-square h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </section>
+
+        <section className="flex flex-col gap-5">
+          <div className="surface-panel-strong p-5 sm:p-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusInfo.badgeClass}`}>
                 {statusInfo.label}
-              </Badge>
-              {product.categoryName && (
-                <span className="text-sm text-gray-400">{product.categoryName}</span>
-              )}
+              </span>
+              {product.categoryName ? (
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-gray-500 ring-1 ring-orange-100">
+                  {product.categoryName}
+                </span>
+              ) : null}
+              {isOwner ? (
+                <span className="rounded-full bg-[var(--getchu-orange-pale)] px-3 py-1 text-xs font-semibold text-[var(--getchu-orange-strong)]">
+                  내 상품
+                </span>
+              ) : null}
             </div>
 
-            {/* 제목 + 가격 */}
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-3">{product.title}</h1>
-              <p className="text-3xl font-bold text-[var(--getchu-orange-strong)]">{product.price.toLocaleString()}원</p>
-              <p className="text-sm text-gray-400 mt-1">
-                {new Date(product.createdAt).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" })}
+            <h2 className="mt-4 text-3xl font-bold leading-tight text-gray-900">{product.title}</h2>
+
+            <div className="mt-5">
+              <p className="text-4xl font-bold tracking-tight text-[var(--getchu-orange-strong)]">
+                {product.price.toLocaleString()}원
               </p>
+              <p className="mt-2 text-sm text-gray-400">{formatDate(product.createdAt)}</p>
             </div>
+          </div>
 
-            {/* 판매자 정보 */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">판매자</p>
-              <div
-                className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={() => navigate(`/members/${product.sellerId}/reviews`)}
-              >
-                <div className="w-11 h-11 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center shrink-0">
-                  {seller?.profileImageUrl ? (
-                    <img src={seller.profileImageUrl} alt={product.sellerNickname} className="w-full h-full object-cover" />
-                  ) : (
-                    <User className="w-5 h-5 text-gray-400" />
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">{product.sellerNickname}</p>
-                  {seller && (
-                    <p className="text-xs text-gray-400">⭐ {seller.averageRating.toFixed(1)} · 리뷰 {seller.reviewCount}개</p>
-                  )}
-                </div>
+          <div className="surface-panel p-5 sm:p-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--getchu-orange)]">
+                  Seller
+                </p>
+                <h3 className="mt-1 text-lg font-semibold text-gray-900">판매자 정보</h3>
               </div>
             </div>
 
-            {/* 상품 설명 */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4 flex-1">
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">상품 설명</p>
-              <p className="text-sm text-gray-700 whitespace-pre-line leading-relaxed">
-                {product.description || "설명이 없습니다."}
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={() => navigate(`/members/${product.sellerId}/reviews`)}
+              className="flex w-full items-center gap-4 rounded-[24px] border border-[var(--getchu-border)] bg-[var(--getchu-cream)]/55 px-4 py-4 text-left transition hover:-translate-y-0.5 hover:border-orange-200"
+            >
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white text-gray-400 shadow-sm">
+                {seller?.profileImageUrl ? (
+                  <img src={seller.profileImageUrl} alt={product.sellerNickname} className="h-full w-full object-cover" />
+                ) : (
+                  <User className="h-6 w-6" />
+                )}
+              </div>
 
-            {/* 액션 버튼 */}
-            <div className="flex items-center gap-3">
-              {!isOwner && product.status !== "SOLD_OUT" && (
+              <div className="min-w-0 flex-1">
+                <p className="text-base font-semibold text-gray-900">{product.sellerNickname}</p>
+                {seller ? (
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+                    <span className="inline-flex items-center gap-1 font-medium text-[var(--getchu-orange-strong)]">
+                      <Star className="h-4 w-4 fill-current" />
+                      {seller.averageRating.toFixed(1)}
+                    </span>
+                    <span>리뷰 {seller.reviewCount}개</span>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-sm text-gray-400">판매자 정보를 불러오는 중이에요.</p>
+                )}
+              </div>
+            </button>
+          </div>
+
+          <div className="surface-panel p-5 sm:p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--getchu-orange)]">
+              Description
+            </p>
+            <h3 className="mt-1 text-lg font-semibold text-gray-900">상품 설명</h3>
+            <p className="mt-4 whitespace-pre-line text-sm leading-7 text-gray-700 sm:text-[15px]">
+              {product.description || "설명이 아직 없어요."}
+            </p>
+          </div>
+
+          <div className="surface-panel p-4 sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row">
+              {!isOwner && product.status !== "SOLD_OUT" ? (
                 <button
+                  type="button"
                   onClick={handleLike}
-                  className={`p-3 rounded-xl border-2 transition-colors ${isLiked ? "border-red-400 bg-red-50 text-red-500" : "border-gray-200 hover:border-gray-300 text-gray-500"}`}
+                  className={`btn-interactive inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full border transition ${
+                    isLiked
+                      ? "border-red-200 bg-red-50 text-red-500"
+                      : "border-[var(--getchu-border)] bg-white text-gray-500 hover:border-orange-200 hover:text-[var(--getchu-orange-strong)]"
+                  }`}
                 >
-                  <Heart className={`w-5 h-5 ${isLiked ? "fill-red-500" : ""}`} />
+                  <Heart className={`h-5 w-5 ${isLiked ? "fill-current" : ""}`} />
                 </button>
-              )}
-              <div className="flex-1 flex gap-2">
+              ) : null}
+
+              <div className="flex flex-1 flex-col gap-3 sm:flex-row">
                 {isOwner ? (
                   <Button
-                    variant="outline"
+                    type="button"
                     onClick={() => navigate(`/products/${product.id}/edit`)}
-                    className="w-full h-12 text-base font-medium"
+                    className="h-14 flex-1 rounded-full bg-[var(--getchu-orange)] text-base font-semibold hover:bg-[var(--getchu-orange-strong)]"
                   >
-                    수정하기
+                    <PencilLine className="mr-2 h-4 w-4" />
+                    상품 수정
                   </Button>
                 ) : (
                   <>
                     <Button
+                      type="button"
+                      variant="outline"
                       onClick={handleReserve}
                       disabled={actionLoading || product.status !== "SALE"}
-                      variant="outline"
-                      className="flex-1 h-12 text-base font-medium border-orange-200 text-[var(--getchu-orange-strong)] hover:bg-[var(--getchu-orange-pale)] disabled:opacity-40"
+                      className="h-14 flex-1 rounded-full border-orange-200 text-base font-semibold text-[var(--getchu-orange-strong)] hover:bg-[var(--getchu-orange-pale)] disabled:opacity-45"
                     >
                       {product.status === "RESERVED" ? "예약중" : "예약하기"}
                     </Button>
                     <Button
+                      type="button"
                       onClick={handleChat}
                       disabled={actionLoading || product.status === "SOLD_OUT"}
-                      className="flex-1 h-12 text-base font-medium bg-[var(--getchu-orange)] hover:bg-[var(--getchu-orange-strong)]"
+                      className="h-14 flex-1 rounded-full bg-[var(--getchu-orange)] text-base font-semibold hover:bg-[var(--getchu-orange-strong)] disabled:opacity-45"
                     >
+                      <MessageCircle className="mr-2 h-4 w-4" />
                       {product.status === "SOLD_OUT" ? "판매완료" : "채팅하기"}
                     </Button>
                   </>
@@ -267,8 +379,8 @@ export default function ProductDetailPage() {
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        </section>
+      </main>
     </div>
   );
 }
