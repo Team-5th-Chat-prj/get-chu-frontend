@@ -20,20 +20,20 @@ export default function MyPage() {
 
   return (
     <div className="min-h-screen bg-transparent pb-20">
-      <header className="border-b border-gray-200 px-4 py-4">
-        <div className="flex items-center justify-between gap-3">
+      <header className="border-b border-orange-100 bg-white/78 px-3 py-4 backdrop-blur-xl sm:px-4">
+        <div className="flex flex-row-reverse items-center justify-end gap-4">
           <h1 className="text-lg font-medium">마이페이지</h1>
           <button
             type="button"
             onClick={() => navigate("/")}
-            className="btn-interactive flex items-center justify-center rounded-full border border-orange-100 bg-white p-2 shadow-sm"
+            className="btn-interactive flex shrink-0 items-center justify-center"
             aria-label="홈으로 이동"
           >
-            <div className="flex size-10 items-center justify-center overflow-hidden rounded-[1.1rem] bg-[radial-gradient(circle_at_top,#fff7ee,#ffe8cc_62%,#ffc98b)] ring-1 ring-orange-100/70">
+            <div className="flex size-[4.1rem] items-center justify-center overflow-hidden rounded-[1.4rem] bg-[radial-gradient(circle_at_top,#fff7ee,#ffe8cc_62%,#ffc98b)] shadow-[0_14px_24px_rgba(255,138,61,0.17)] ring-1 ring-orange-100/70">
               <img
                 src={foxHeadImage}
                 alt="Get-chu"
-                className="h-full w-full object-contain object-center mix-blend-multiply saturate-[1.05] contrast-[1.01]"
+                className="h-full w-full -translate-x-[8%] scale-[0.7] object-contain object-center mix-blend-multiply saturate-[1.05] contrast-[1.01] drop-shadow-[0_8px_14px_rgba(255,138,61,0.1)]"
               />
             </div>
           </button>
