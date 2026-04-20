@@ -1,0 +1,167 @@
+import { ChevronRight, Home, MessageCircle, User } from "lucide-react";
+import { useNavigate } from "react-router";
+import { Button } from "../components/ui/button";
+import { useAuth } from "../contexts/AuthContext";
+import { useEffect } from "react";
+import foxHeadImage from "../../assets/logo-fox-head.png";
+
+export default function MyPage() {
+  const navigate = useNavigate();
+  const { user, logout, refreshUser } = useAuth();
+
+  useEffect(() => {
+    refreshUser().catch(() => {});
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+  };
+
+  return (
+    <div className="min-h-screen bg-transparent pb-20">
+      <header className="border-b border-gray-200 px-4 py-4">
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-lg font-medium">마이페이지</h1>
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            className="btn-interactive flex items-center justify-center rounded-full border border-orange-100 bg-white p-2 shadow-sm"
+            aria-label="홈으로 이동"
+          >
+            <div className="flex size-10 items-center justify-center overflow-hidden rounded-[1.1rem] bg-[radial-gradient(circle_at_top,#fff7ee,#ffe8cc_62%,#ffc98b)] ring-1 ring-orange-100/70">
+              <img
+                src={foxHeadImage}
+                alt="Get-chu"
+                className="h-full w-full object-contain object-center mix-blend-multiply saturate-[1.05] contrast-[1.01]"
+              />
+            </div>
+          </button>
+        </div>
+      </header>
+
+      <div className="px-4 py-6">
+        <div className="mb-4 flex items-center gap-4">
+          <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-gray-200 text-2xl shadow-sm">
+            {user?.profileImageUrl ? (
+              <img src={user.profileImageUrl} alt="프로필 이미지" className="h-full w-full object-cover" />
+            ) : (
+              <span>G</span>
+            )}
+          </div>
+
+          <div className="flex-1">
+            <h2 className="mb-1 text-lg font-bold">{user?.nickname || "사용자"}</h2>
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <span>평점 {user?.averageRating?.toFixed(1) || "0.0"}</span>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => user && navigate(`/members/${user.id}/reviews`)}
+                className="text-[var(--getchu-orange-strong)] underline underline-offset-2"
+              >
+                리뷰 {user?.reviewCount || 0}개
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <Button variant="outline" className="w-full border-gray-300" onClick={() => navigate("/my/profile/edit")}>
+          프로필 수정
+        </Button>
+      </div>
+
+      <div className="border-t border-gray-200 py-2">
+        <button
+          type="button"
+          onClick={() => navigate("/my/products")}
+          className="flex w-full items-center justify-between px-4 py-4 hover:bg-gray-50"
+        >
+          <span className="flex items-center gap-3">
+            <span className="text-2xl">📦</span>
+            <span className="text-base">내 판매 목록</span>
+          </span>
+          <ChevronRight className="w-5 h-5 text-gray-400" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate("/my/purchases")}
+          className="flex w-full items-center justify-between px-4 py-4 hover:bg-gray-50"
+        >
+          <span className="flex items-center gap-3">
+            <span className="text-2xl">🛍️</span>
+            <span className="text-base">내 구매 목록</span>
+          </span>
+          <ChevronRight className="w-5 h-5 text-gray-400" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate("/my/likes")}
+          className="flex w-full items-center justify-between px-4 py-4 hover:bg-gray-50"
+        >
+          <span className="flex items-center gap-3">
+            <span className="text-2xl">❤️</span>
+            <span className="text-base">찜 목록</span>
+          </span>
+          <ChevronRight className="w-5 h-5 text-gray-400" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate("/my/reviews/written")}
+          className="flex w-full items-center justify-between px-4 py-4 hover:bg-gray-50"
+        >
+          <span className="flex items-center gap-3">
+            <span className="text-2xl">⭐</span>
+            <span className="text-base">내가 작성한 리뷰</span>
+          </span>
+          <ChevronRight className="w-5 h-5 text-gray-400" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate("/chat")}
+          className="flex w-full items-center justify-between px-4 py-4 hover:bg-gray-50"
+        >
+          <span className="flex items-center gap-3">
+            <span className="text-2xl">💬</span>
+            <span className="text-base">채팅</span>
+          </span>
+          <ChevronRight className="w-5 h-5 text-gray-400" />
+        </button>
+      </div>
+
+      <div className="space-y-3 px-4 py-6">
+        <Button
+          onClick={() => navigate("/my/password")}
+          variant="outline"
+          className="w-full border-gray-300 text-gray-700"
+        >
+          비밀번호 변경
+        </Button>
+        <Button onClick={handleLogout} variant="outline" className="w-full border-gray-300 text-gray-700">
+          로그아웃
+        </Button>
+      </div>
+
+      <nav className="fixed bottom-0 left-0 right-0 border-t border-orange-100 bg-white/90 backdrop-blur-xl md:hidden">
+        <div className="floating-nav flex items-center justify-around py-3">
+          <button onClick={() => navigate("/")} className="flex flex-col items-center gap-1 text-gray-500">
+            <Home className="w-6 h-6" />
+            <span className="text-xs">홈</span>
+          </button>
+          <button onClick={() => navigate("/chat")} className="flex flex-col items-center gap-1 text-gray-500">
+            <MessageCircle className="w-6 h-6" />
+            <span className="text-xs">채팅</span>
+          </button>
+          <button className="flex flex-col items-center gap-1 text-[var(--getchu-orange)]">
+            <User className="w-6 h-6" />
+            <span className="text-xs">마이</span>
+          </button>
+        </div>
+      </nav>
+    </div>
+  );
+}

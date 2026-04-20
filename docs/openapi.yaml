@@ -1,0 +1,430 @@
+openapi: 3.0.3
+info:
+  title: 중고거래 플랫폼 API V2
+  version: 2.0.0
+  description: ApiResponse 공통 응답 구조가 적용된 마켓플레이스 백엔드 최상위 규격 문서
+servers:
+  - url: https://api.marketplace.com/api/v1
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ApiResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          example: "SUCCESS"
+        message:
+          type: string
+          example: "요청이 성공적으로 처리되었습니다."
+        data:
+          type: object
+          description: 응답 데이터 (에러 시에는 생략됨)
+          nullable: true
+
+paths:
+  /auth/signup:
+    post:
+      tags: [Auth]
+      summary: 회원가입
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, nickname]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                nickname:
+                  type: string
+                profileImageUrl:
+                  type: string
+      responses:
+        '201':
+          description: 회원가입 완료
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id: { type: integer }
+                          email: { type: string }
+                          nickname: { type: string }
+                          createdAt: { type: string, format: date-time }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: 로그인
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: 로그인 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          accessToken: { type: string }
+                          refreshToken: { type: string }
+                          tokenType: { type: string }
+                          expiresIn: { type: integer }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: 로그아웃
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 로그아웃 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: 토큰 재발급
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: 재발급 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          accessToken: { type: string }
+                          refreshToken: { type: string }
+                          tokenType: { type: string }
+                          expiresIn: { type: integer }
+
+  /members/me:
+    get:
+      tags: [Member]
+      summary: 내 프로필 조회
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id: { type: integer }
+                          email: { type: string }
+                          nickname: { type: string }
+                          profileImageUrl: { type: string }
+                          averageRating: { type: number, format: float }
+                          reviewCount: { type: integer }
+                          createdAt: { type: string, format: date-time }
+    patch:
+      tags: [Member]
+      summary: 내 프로필 수정
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nickname: { type: string }
+                profileImageUrl: { type: string }
+      responses:
+        '200':
+          description: 수정 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object # GET /members/me와 동일 구조 반환
+
+  /products:
+    get:
+      tags: [Product]
+      summary: 상품 목록 조회
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: status
+          in: query
+          schema: { type: string, enum: [SALE, RESERVED, SOLD, ALL], default: SALE }
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          content:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: integer }
+                                title: { type: string }
+                                price: { type: integer }
+                                status: { type: string }
+                                thumbnailUrl: { type: string }
+                                likeCount: { type: integer }
+                                createdAt: { type: string, format: date-time }
+                          nextCursor: { type: string }
+                          hasNext: { type: boolean }
+    post:
+      tags: [Product]
+      summary: 상품 등록
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, price, categoryId]
+              properties:
+                title: { type: string }
+                description: { type: string }
+                price: { type: integer }
+                categoryId: { type: integer }
+                imageUrls:
+                  type: array
+                  items: { type: string }
+      responses:
+        '201':
+          description: 등록 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id: { type: integer }
+                          title: { type: string }
+                          status: { type: string }
+
+  /products/{productId}/reserve:
+    post:
+      tags: [Trade]
+      summary: 예약 요청
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 예약 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          tradeId: { type: integer }
+                          productId: { type: integer }
+                          status: { type: string }
+
+  /chat-rooms:
+    post:
+      tags: [Chat]
+      summary: 채팅방 생성
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId]
+              properties:
+                productId: { type: integer }
+      responses:
+        '200':
+          description: 기존 채팅방 반환 또는 생성 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          chatRoomId: { type: integer }
+                          created: { type: boolean }
+
+  /chat-rooms/{chatRoomId}/messages:
+    get:
+      tags: [Chat]
+      summary: 채팅 이력 조회
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: chatRoomId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            messageId: { type: integer }
+                            senderId: { type: integer }
+                            senderNickname: { type: string }
+                            content: { type: string }
+                            createdAt: { type: string, format: date-time }
+
+  /trades/{tradeId}/reviews:
+    post:
+      tags: [Review]
+      summary: 리뷰 작성
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tradeId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating, content]
+              properties:
+                rating: { type: integer, minimum: 1, maximum: 5 }
+                content: { type: string }
+      responses:
+        '201':
+          description: 리뷰 등록 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          reviewId: { type: integer }
+                          tradeId: { type: integer }
+                          rating: { type: integer }
+
+  /products/{productId}/likes:
+    post:
+      tags: [Like]
+      summary: 찜하기
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
