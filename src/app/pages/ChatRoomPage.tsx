@@ -63,10 +63,24 @@ export default function ChatRoomPage() {
   useEffect(() => {
     if (!chatRoomId) return;
     const id = Number(chatRoomId);
+    let cancelled = false;
+
     setActiveChatRoomId(id);
     markAsRead(id);
-    return () => setActiveChatRoomId(null); // 퇴장 시 초기화
-  }, [chatRoomId]);
+
+    chatApi.markMessagesAsRead(id)
+      .then(() => {
+        if (!cancelled) {
+          refreshChatRooms();
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+      setActiveChatRoomId(null);
+    }; // 퇴장 시 초기화
+  }, [chatRoomId, markAsRead, refreshChatRooms, setActiveChatRoomId]);
 
   useEffect(() => {
     if (!chatRoomId) return;
@@ -81,8 +95,20 @@ export default function ChatRoomPage() {
     token,
     onConnect: () => setConnected(true),
     onMessage: (msg: ChatMessage) => {
+      if ("type" in msg && msg.type === "READ") {
+        refreshChatRooms();
+        return;
+      }
+
       // ChatListPage의 lastMessage 실시간 갱신
       updateLastMessage(Number(chatRoomId), msg.content);
+
+      if (msg.senderId !== user?.id) {
+        chatApi.markMessagesAsRead(Number(chatRoomId))
+          .then(refreshChatRooms)
+          .catch(() => {});
+      }
+
       setMessages((prev) => {
         // 내가 보낸 메시지가 서버에서 브로드캐스트로 돌아온 경우
         // → 낙관적으로 추가한 메시지(content 일치)를 서버 메시지로 교체

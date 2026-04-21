@@ -24,6 +24,11 @@ export const chatApi = {
   leaveChatRoom: async (chatRoomId: number): Promise<void> => {
     await apiClient.delete(`/chat-rooms/${chatRoomId}/leave`);
   },
+
+  markMessagesAsRead: async (chatRoomId: number): Promise<void> => {
+    await apiClient.patch(`/chat-rooms/${chatRoomId}/read`);
+  },
+
   // 백엔드: cursor는 Long(messageId), size 기본 30
   getMessages: async (
     chatRoomId: number,

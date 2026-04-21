@@ -19,6 +19,11 @@ interface ChatContextType {
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
+type ChatRoomEvent = {
+  type?: string;
+  content?: string;
+};
+
 export function ChatProvider({ children }: { children: ReactNode }) {
   const [chatRooms, setChatRooms] = useState<ChatRoomSummary[]>([]);
   const [activeChatRoomId, setActiveChatRoomId] = useState<number | null>(null);
@@ -60,6 +65,19 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const handleRoomEvent = useCallback((chatRoomId: number, event: ChatRoomEvent) => {
+    if (event.type === "READ") {
+      chatApi.getChatRooms().then(setChatRooms).catch(() => {});
+      return;
+    }
+
+    if (typeof event.content !== "string") {
+      return;
+    }
+
+    handleIncomingMessage(chatRoomId, event.content);
+  }, [handleIncomingMessage]);
+
   // 새 채팅방 구독 추가 (기존 구독은 유지)
   const subscribeNew = useCallback((rooms: ChatRoomSummary[], client: Client) => {
     rooms.forEach((room) => {
@@ -69,7 +87,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           (frame: IMessage) => {
             try {
               const msg = JSON.parse(frame.body);
-              handleIncomingMessage(room.chatRoomId, msg.content);
+              handleRoomEvent(room.chatRoomId, msg);
             } catch {
               console.error("[전역 STOMP] 파싱 실패", frame.body);
             }
@@ -78,7 +96,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         subscriptionsRef.current.set(room.chatRoomId, sub);
       }
     });
-  }, [handleIncomingMessage]);
+  }, [handleRoomEvent]);
 
   // 전체 재구독 (초기 연결 시 사용)
   const subscribeAll = useCallback((rooms: ChatRoomSummary[], client: Client) => {
@@ -93,7 +111,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           (frame: IMessage) => {
             try {
               const msg = JSON.parse(frame.body);
-              handleIncomingMessage(room.chatRoomId, msg.content);
+              handleRoomEvent(room.chatRoomId, msg);
             } catch {
               console.error("[전역 STOMP] 파싱 실패", frame.body);
             }
@@ -102,7 +120,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         subscriptionsRef.current.set(room.chatRoomId, sub);
       } catch {}
     });
-  }, [handleIncomingMessage]);
+  }, [handleRoomEvent]);
 
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
