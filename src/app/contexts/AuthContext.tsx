@@ -59,8 +59,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("user", JSON.stringify(me));
   };
 
-  const signup = async (email: string, password: string, nickname: string) => {
-    await authApi.signup({ email, password, nickname });
+  const signup = async (email: string, password: string, nickname: string, profileImageUrl?: string) => {
+    await authApi.signup({
+      email,
+      password,
+      nickname,
+      ...(profileImageUrl ? { profileImageUrl } : {}),
+    });
   };
 
   const logout = async () => {
