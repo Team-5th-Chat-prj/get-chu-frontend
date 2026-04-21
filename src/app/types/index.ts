@@ -11,6 +11,17 @@ export interface CursorResponse<T> {
   hasNext: boolean;
 }
 
+export interface PageResponse<T> {
+  content: T[];
+  totalElements?: number;
+  totalPages?: number;
+  number?: number;
+  size?: number;
+  first?: boolean;
+  last?: boolean;
+  empty?: boolean;
+}
+
 // ─── 상품 ────────────────────────────────────────────────
 // 백엔드 ProductEnum: SALE | RESERVED | SOLD_OUT
 export type ProductStatus = "SALE" | "RESERVED" | "SOLD_OUT";
@@ -34,6 +45,7 @@ export interface ProductDetail {
   description: string;
   price: number;
   status: ProductStatus;
+  likeCount?: number;
   categoryName: string | null;
   sellerNickname: string;
   imageUrls: string[];
