@@ -3,6 +3,7 @@ import {
   ApiResponse,
   CursorResponse,
   Member,
+  PageResponse,
   PublicMember,
   ProductSummary,
   Review,
@@ -58,8 +59,8 @@ export const membersApi = {
   getMyLikes: async (params?: {
     cursor?: string;
     size?: number;
-  }): Promise<CursorResponse<ProductSummary>> => {
-    const response = await apiClient.get<ApiResponse<CursorResponse<ProductSummary>>>(
+  }): Promise<PageResponse<ProductSummary>> => {
+    const response = await apiClient.get<ApiResponse<PageResponse<ProductSummary>>>(
       "/members/me/likes",
       { params }
     );

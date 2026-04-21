@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Button } from "../button";
 
 interface StateCardProps {
@@ -39,7 +39,7 @@ export default function StateCard({
             <img
               src={mascotImage}
               alt={mascotAlt}
-              className="mascot-float h-20 w-auto object-contain drop-shadow-[0_10px_18px_rgba(255,138,61,0.16)]"
+              className="mascot-float h-20 w-auto -translate-x-[9%] object-contain drop-shadow-[0_10px_18px_rgba(255,138,61,0.16)]"
             />
           </div>
         ) : null}
