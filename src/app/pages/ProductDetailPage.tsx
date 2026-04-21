@@ -53,6 +53,7 @@ export default function ProductDetailPage() {
   const [seller, setSeller] = useState<PublicMember | null>(null);
   const [currentImage, setCurrentImage] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -63,20 +64,30 @@ export default function ProductDetailPage() {
 
     setLoading(true);
     setCurrentImage(0);
+    setIsLiked(false);
+    setLikeCount(0);
 
     productsApi
       .getProduct(Number(id))
-      .then((data) => {
+      .then(async (data) => {
         setProduct(data);
-        return membersApi.getMember(data.sellerId);
+        setLikeCount(data.likeCount ?? 0);
+        const [sellerData, likesData] = await Promise.all([
+          membersApi.getMember(data.sellerId),
+          isAuthenticated
+            ? membersApi.getMyLikes({ size: 200 }).catch(() => null)
+            : Promise.resolve(null),
+        ]);
+
+        setSeller(sellerData);
+        setIsLiked(Boolean(likesData?.content.some((item) => item.id === data.id)));
       })
-      .then((sellerData) => setSeller(sellerData))
       .catch(() => {
         toast.error("상품을 찾을 수 없어요.");
         navigate("/");
       })
       .finally(() => setLoading(false));
-  }, [id, navigate]);
+  }, [id, isAuthenticated, navigate]);
 
   if (loading || !product) {
     return (
@@ -98,16 +109,28 @@ export default function ProductDetailPage() {
       return;
     }
 
+    const nextIsLiked = !isLiked;
+    const optimisticLikeCount = Math.max(0, likeCount + (nextIsLiked ? 1 : -1));
+
     try {
       if (isLiked) {
         await productsApi.deleteLike(product.id);
         setIsLiked(false);
+        setLikeCount(optimisticLikeCount);
         toast.success("찜을 취소했어요.");
       } else {
         await productsApi.createLike(product.id);
         setIsLiked(true);
+        setLikeCount(optimisticLikeCount);
         toast.success("찜했어요.");
       }
+
+      const [freshProduct, likesData] = await Promise.all([
+        productsApi.getProduct(product.id).catch(() => null),
+        membersApi.getMyLikes({ size: 200 }).catch(() => null),
+      ]);
+      setLikeCount(freshProduct?.likeCount ?? optimisticLikeCount);
+      setIsLiked(Boolean(likesData?.content.some((item) => item.id === product.id)));
     } catch {
       toast.error("찜 처리 중 문제가 생겼어요.");
     }
@@ -261,6 +284,10 @@ export default function ProductDetailPage() {
                   {product.categoryName}
                 </span>
               ) : null}
+              <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-xs font-semibold text-red-500 ring-1 ring-red-100">
+                <Heart className="h-3.5 w-3.5 fill-current" />
+                {likeCount}
+              </span>
               {isOwner ? (
                 <span className="rounded-full bg-[var(--getchu-orange-pale)] px-3 py-1 text-xs font-semibold text-[var(--getchu-orange-strong)]">
                   내 상품
@@ -334,13 +361,14 @@ export default function ProductDetailPage() {
                 <button
                   type="button"
                   onClick={handleLike}
-                  className={`btn-interactive inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full border transition ${
+                  className={`btn-interactive inline-flex h-14 shrink-0 items-center justify-center gap-2 rounded-full border px-5 transition ${
                     isLiked
                       ? "border-red-200 bg-red-50 text-red-500"
                       : "border-[var(--getchu-border)] bg-white text-gray-500 hover:border-orange-200 hover:text-[var(--getchu-orange-strong)]"
                   }`}
                 >
                   <Heart className={`h-5 w-5 ${isLiked ? "fill-current" : ""}`} />
+                  <span className="text-sm font-semibold">{likeCount}</span>
                 </button>
               ) : null}
 
