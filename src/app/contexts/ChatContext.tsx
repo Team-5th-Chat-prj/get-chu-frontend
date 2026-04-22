@@ -175,6 +175,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       }
     } catch (err) {
       console.error("[전역 STOMP] 채팅방 목록 갱신 실패", err);
+      throw err;
     }
   }, [subscribeNew]);
 

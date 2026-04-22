@@ -3,7 +3,6 @@ import {
   ArrowLeft,
   Home,
   MessageCircle,
-  MessageSquareText,
   User,
   Users,
 } from "lucide-react";
@@ -11,8 +10,12 @@ import { useNavigate } from "react-router";
 import { productsApi } from "../api/products";
 import { tradesApi } from "../api/trades";
 import { Button } from "../components/ui/button";
+import ChatListEmptyState from "../components/ui/state/ChatListEmptyState";
+import ChatListLoadingState from "../components/ui/state/ChatListLoadingState";
+import ErrorState from "../components/ui/state/ErrorState";
 import { useChatContext } from "../contexts/ChatContext";
 import { TradeStatus } from "../types";
+import foxHeadImage from "../../assets/logo-fox-head.png";
 
 const tradeStatusMeta: Partial<Record<TradeStatus, { label: string; className: string }>> = {
   RESERVED: {
@@ -37,11 +40,20 @@ export default function ChatListPage() {
   const navigate = useNavigate();
   const { chatRooms, markAsRead, refreshChatRooms } = useChatContext();
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
   const [productTitles, setProductTitles] = useState<Record<number, string>>({});
   const [tradeStatuses, setTradeStatuses] = useState<Record<number, TradeStatus>>({});
 
+  const loadChatRooms = () => {
+    setLoading(true);
+    setErrorMessage("");
+    refreshChatRooms()
+      .catch(() => setErrorMessage("채팅 목록을 불러오지 못했어요. 잠시 후 다시 시도해주세요."))
+      .finally(() => setLoading(false));
+  };
+
   useEffect(() => {
-    refreshChatRooms().finally(() => setLoading(false));
+    loadChatRooms();
   }, []);
 
   useEffect(() => {
@@ -172,14 +184,20 @@ export default function ChatListPage() {
 
           <div className="px-4 py-5 sm:px-6">
             {loading ? (
-              <div className="rounded-[26px] border border-dashed border-[var(--getchu-border)] bg-[var(--getchu-cream)]/60 px-6 py-16 text-center text-sm text-gray-500">
-                채팅 목록을 불러오고 있어요.
-              </div>
+              <ChatListLoadingState />
+            ) : errorMessage ? (
+              <ErrorState
+                title="채팅 목록을 불러오지 못했어요"
+                description={errorMessage}
+                actionLabel="다시 불러오기"
+                onAction={loadChatRooms}
+                mascotImage={foxHeadImage}
+              />
             ) : chatRooms.length === 0 ? (
-              <div className="rounded-[26px] border border-dashed border-[var(--getchu-border)] bg-[var(--getchu-cream)]/60 px-6 py-16 text-center">
-                <MessageSquareText className="mx-auto h-10 w-10 text-[var(--getchu-orange)]/70" />
-                <p className="mt-4 text-base font-medium text-gray-900">아직 채팅 내역이 없어요.</p>
-              </div>
+              <ChatListEmptyState
+                onAction={() => navigate("/")}
+                mascotImage={foxHeadImage}
+              />
             ) : (
               <div className="space-y-4">
                 {chatRooms.map((room) => {
