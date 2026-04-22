@@ -6,6 +6,8 @@ import {
   ProductDetail,
   ProductPayload,
   Category,
+  NearbyProduct,
+  PageResponse,
   PopularKeywordsResponse,
   TradeReserveResponse,
 } from "../types";
@@ -71,6 +73,19 @@ export const productsApi = {
     size?: number;
   }): Promise<CursorResponse<ProductSummary>> => {
     return productsApi.getProducts(params);
+  },
+
+  getNearbyProducts: async (params: {
+    lat: number;
+    lng: number;
+    radius?: number;
+    page?: number;
+  }): Promise<PageResponse<NearbyProduct>> => {
+    const response = await apiClient.get<ApiResponse<PageResponse<NearbyProduct>>>(
+      "/api/products/nearby",
+      { params }
+    );
+    return response.data.data;
   },
 
   // ─── 상품 상세 ─────────────────────────────────────────

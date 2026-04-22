@@ -18,6 +18,8 @@ import ProfileEditPage from "./pages/ProfileEditPage";
 import PasswordChangePage from "./pages/PasswordChangePage";
 import MemberReviewsPage from "./pages/MemberReviewsPage";
 import MyWrittenReviewsPage from "./pages/MyWrittenReviewsPage";
+import LocationVerifyPage from "./pages/LocationVerifyPage";
+import NearbyProductsPage from "./pages/NearbyProductsPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ChatProvider } from "./contexts/ChatContext";
 
@@ -45,6 +47,8 @@ export default function App() {
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/trades/:id/review" element={<ReviewPage />} />
           <Route path="/members/:memberId/reviews" element={<MemberReviewsPage />} />
+          <Route path="/location/verify" element={<LocationVerifyPage />} />
+          <Route path="/nearby" element={<NearbyProductsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <Toaster />

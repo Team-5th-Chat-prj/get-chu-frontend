@@ -37,6 +37,20 @@ export interface ProductSummary {
   createdAt: string;
 }
 
+export interface NearbyProduct {
+  id: number;
+  title: string;
+  price: number;
+  status: ProductStatus;
+  categoryName: string | null;
+  sellerNickname: string;
+  thumbnailUrl: string | null;
+  locationName: string | null;
+  lat: number | null;
+  lng: number | null;
+  distanceKm: number;
+}
+
 /** GET /products/:id 상세 응답 (ProductResponse) */
 export interface ProductDetail {
   id: number;
@@ -129,6 +143,11 @@ export interface TradeReserveResponse {
   productTitle: string;
   sellerNickname: string;
   buyerNickname: string;
+}
+
+export interface LocationVerifyResponse {
+  locationName: string;
+  locationRadius: number;
 }
 
 // ─── 채팅 ────────────────────────────────────────────────
