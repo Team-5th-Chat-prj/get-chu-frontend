@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, House, MessageSquareText, Star, User } from "lucide-react";
+import { ArrowLeft, House, Star, User } from "lucide-react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
+import foxHeadImage from "../../assets/logo-fox-head.png";
 import { membersApi } from "../api/members";
 import { Button } from "../components/ui/button";
+import EmptyState from "../components/ui/state/EmptyState";
+import ErrorState from "../components/ui/state/ErrorState";
+import ListLoadingState from "../components/ui/state/ListLoadingState";
 import { PublicMember, Review } from "../types";
 import { getMockImageUrl } from "../utils/imageStorage";
 
@@ -101,17 +105,28 @@ export default function MemberReviewsPage() {
   const { memberId } = useParams();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  useEffect(() => {
+  const fetchReviews = () => {
     if (!memberId) {
       return;
     }
 
+    setLoading(true);
+    setErrorMessage("");
+
     membersApi
       .getMemberReviews(Number(memberId))
       .then((response) => setReviews(response.content))
-      .catch(() => toast.error("받은 리뷰를 불러오지 못했어요."))
+      .catch(() => {
+        setErrorMessage("받은 리뷰를 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
+        toast.error("받은 리뷰를 불러오지 못했어요.");
+      })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchReviews();
   }, [memberId]);
 
   const averageRating = useMemo(() => {
@@ -191,14 +206,21 @@ export default function MemberReviewsPage() {
 
           <div className="px-4 py-5 sm:px-6">
             {loading ? (
-              <div className="rounded-[26px] border border-dashed border-[var(--getchu-border)] bg-[var(--getchu-cream)]/60 px-6 py-16 text-center text-sm text-gray-500">
-                받은 리뷰를 불러오고 있어요.
-              </div>
+              <ListLoadingState title="정보를 불러오는 중이에요..." description="받은 리뷰를 정리하고 있어요." />
+            ) : errorMessage ? (
+              <ErrorState
+                title="받은 리뷰를 불러오지 못했어요"
+                description={errorMessage}
+                actionLabel="다시 불러오기"
+                onAction={fetchReviews}
+                mascotImage={foxHeadImage}
+              />
             ) : reviews.length === 0 ? (
-              <div className="rounded-[26px] border border-dashed border-[var(--getchu-border)] bg-[var(--getchu-cream)]/60 px-6 py-16 text-center">
-                <MessageSquareText className="mx-auto h-10 w-10 text-[var(--getchu-orange)]/70" />
-                <p className="mt-4 text-base font-medium text-gray-900">아직 받은 리뷰가 없어요.</p>
-              </div>
+              <EmptyState
+                title="아직 받은 리뷰가 없어요"
+                description="거래 후 받은 리뷰가 생기면 여기에 표시돼요."
+                mascotImage={foxHeadImage}
+              />
             ) : (
               <div className="space-y-4">
                 {reviews.map((review) => (
