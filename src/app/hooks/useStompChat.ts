@@ -6,9 +6,11 @@ interface UseStompChatOptions {
   token: string | null;
   onMessage: (msg: any) => void;
   onConnect?: () => void;
+  onDisconnect?: () => void;
+  onError?: () => void;
 }
 
-export function useStompChat({ chatRoomId, token, onMessage, onConnect }: UseStompChatOptions) {
+export function useStompChat({ chatRoomId, token, onMessage, onConnect, onDisconnect, onError }: UseStompChatOptions) {
   const clientRef = useRef<Client | null>(null);
 
   useEffect(() => {
@@ -41,14 +43,16 @@ export function useStompChat({ chatRoomId, token, onMessage, onConnect }: UseSto
 
       onDisconnect: () => {
         console.log("STOMP 연결 해제");
+        onDisconnect?.();
       },
 
       onStompError: (frame) => {
         console.error("STOMP 에러:", frame.headers["message"], frame.body);
+        onError?.();
       },
 
       onWebSocketError: () => {
-        // 재연결 중 발생하는 일시적 에러 무시
+        onError?.();
       },
     });
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { ArrowLeft, Send, User, LogOut } from "lucide-react";
+import { ArrowLeft, Send, LogOut, Loader2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -8,8 +8,15 @@ import { chatApi } from "../api/chat";
 import { ChatMessage } from "../types";
 import { useAuth } from "../contexts/AuthContext";
 import { useStompChat } from "../hooks/useStompChat";
-import { getMockImageUrl } from "../utils/imageStorage";
 import { useChatContext } from "../contexts/ChatContext";
+import MessageBubble from "../components/chat/MessageBubble";
+import EmptyState from "../components/ui/state/EmptyState";
+import ErrorState from "../components/ui/state/ErrorState";
+
+type LocalChatMessage = ChatMessage & {
+  clientId?: string;
+  deliveryStatus?: "sending" | "failed";
+};
 
 // 날짜 구분선용 포맷
 function formatDate(dateStr: string) {
@@ -28,8 +35,8 @@ function formatTime(dateStr: string) {
 }
 
 // 날짜가 바뀌는 지점에 구분선 삽입
-function groupByDate(messages: ChatMessage[]) {
-  const result: Array<{ type: "date"; date: string } | { type: "msg"; msg: ChatMessage }> = [];
+function groupByDate(messages: LocalChatMessage[]) {
+  const result: Array<{ type: "date"; date: string } | { type: "msg"; msg: LocalChatMessage }> = [];
   let lastDate = "";
   for (const msg of messages) {
     const date = formatDate(msg.createdAt);
@@ -51,13 +58,14 @@ export default function ChatRoomPage() {
 
   const opponent = chatRooms.find((r) => r.chatRoomId === Number(chatRoomId));
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<LocalChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [connected, setConnected] = useState(false);
-  // 낙관적 메시지 추적 (content 기준으로 서버 메시지와 매칭)
-  const pendingRef = useRef<Set<string>>(new Set());
+  const pendingRef = useRef<Map<string, { content: string; timeoutId: ReturnType<typeof setTimeout> }>>(new Map());
   const bottomRef = useRef<HTMLDivElement>(null);
+  const hasSendingMessage = messages.some((message) => message.deliveryStatus === "sending");
 
   // 채팅방 입장/퇴장 시 activeChatRoomId 설정 → 전역 STOMP에서 unread 증가 방지
   useEffect(() => {
@@ -71,7 +79,7 @@ export default function ChatRoomPage() {
     chatApi.markMessagesAsRead(id)
       .then(() => {
         if (!cancelled) {
-          refreshChatRooms();
+          refreshChatRooms().catch(() => {});
         }
       })
       .catch(() => {});
@@ -85,8 +93,14 @@ export default function ChatRoomPage() {
   useEffect(() => {
     if (!chatRoomId) return;
     chatApi.getMessages(Number(chatRoomId))
-      .then((res) => setMessages([...res.content].reverse()))
-      .catch(() => toast.error("메시지를 불러오지 못했습니다"))
+      .then((res) => {
+        setMessages([...res.content].reverse());
+        setLoadError("");
+      })
+      .catch(() => {
+        setLoadError("메시지를 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
+        toast.error("메시지를 불러오지 못했어요.");
+      })
       .finally(() => setLoading(false));
   }, [chatRoomId]);
 
@@ -94,9 +108,11 @@ export default function ChatRoomPage() {
     chatRoomId: Number(chatRoomId),
     token,
     onConnect: () => setConnected(true),
+    onDisconnect: () => setConnected(false),
+    onError: () => setConnected(false),
     onMessage: (msg: ChatMessage) => {
       if ("type" in msg && msg.type === "READ") {
-        refreshChatRooms();
+        refreshChatRooms().catch(() => {});
         return;
       }
 
@@ -111,14 +127,25 @@ export default function ChatRoomPage() {
 
       setMessages((prev) => {
         // 내가 보낸 메시지가 서버에서 브로드캐스트로 돌아온 경우
-        // → 낙관적으로 추가한 메시지(content 일치)를 서버 메시지로 교체
-        if (msg.senderId === user?.id && pendingRef.current.has(msg.content)) {
-          pendingRef.current.delete(msg.content);
-          return prev.map((m) =>
-            m.senderId === user?.id && m.content === msg.content && m.messageId > 1e12
-              ? msg  // 임시 ID → 실제 서버 메시지로 교체
-              : m
-          );
+        // → 낙관적으로 추가한 메시지(content 일치)를 서버 메시지로 교체한다.
+        if (msg.senderId === user?.id) {
+          const pendingEntry = [...pendingRef.current.entries()].find(([, value]) => value.content === msg.content);
+
+          if (pendingEntry) {
+            const [clientId, value] = pendingEntry;
+            window.clearTimeout(value.timeoutId);
+            pendingRef.current.delete(clientId);
+
+            return prev.map((message) =>
+              message.clientId === clientId
+                ? {
+                    ...msg,
+                    deliveryStatus: undefined,
+                    clientId: undefined,
+                  }
+                : message,
+            );
+          }
         }
         // 상대방 메시지 — 중복 방지
         if (prev.some((m) => m.messageId === msg.messageId)) return prev;
@@ -131,6 +158,13 @@ export default function ChatRoomPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  useEffect(() => {
+    return () => {
+      pendingRef.current.forEach(({ timeoutId }) => window.clearTimeout(timeoutId));
+      pendingRef.current.clear();
+    };
+  }, []);
+
   const handleLeave = async () => {
     if (!window.confirm("채팅방을 나가시겠습니까?")) return;
     try {
@@ -142,24 +176,80 @@ export default function ChatRoomPage() {
     }
   };
 
-  const handleSend = () => {
-    if (!input.trim() || !user) return;
-    const content = input.trim();
+  const markMessageFailed = (clientId: string) => {
+    pendingRef.current.delete(clientId);
+    setMessages((prev) =>
+      prev.map((message) =>
+        message.clientId === clientId
+          ? {
+              ...message,
+              deliveryStatus: "failed",
+            }
+          : message,
+      ),
+    );
+  };
 
-    // 낙관적 UI
-    const optimistic: ChatMessage = {
-      messageId: Date.now(), // 임시 ID (1e12 이상)
+  const sendContent = (content: string, existingClientId?: string) => {
+    if (!content.trim() || !user) return;
+    if (!connected) {
+      toast.error("채팅 연결이 준비되지 않았어요. 잠시 후 다시 시도해주세요.");
+      return;
+    }
+
+    const clientId = existingClientId ?? `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const createdAt = new Date().toISOString();
+
+    const optimistic: LocalChatMessage = {
+      messageId: Date.now(),
       chatRoomId: Number(chatRoomId),
       senderId: user.id,
       senderNickname: user.nickname,
       content,
       isRead: false,
-      createdAt: new Date().toISOString(),
+      createdAt,
+      clientId,
+      deliveryStatus: "sending",
     };
-    pendingRef.current.add(content);
-    setMessages((prev) => [...prev, optimistic]);
-    stompSend(content);
+
+    const timeoutId = window.setTimeout(() => {
+      markMessageFailed(clientId);
+    }, 8000);
+
+    pendingRef.current.set(clientId, { content, timeoutId });
+
+    setMessages((prev) => {
+      if (existingClientId) {
+        return prev.map((message) => (message.clientId === existingClientId ? optimistic : message));
+      }
+
+      return [...prev, optimistic];
+    });
+
+    const sent = stompSend(content);
+
+    if (!sent) {
+      window.clearTimeout(timeoutId);
+      markMessageFailed(clientId);
+      toast.error("메시지를 보내지 못했어요. 다시 시도해주세요.");
+      return;
+    }
+
+    updateLastMessage(Number(chatRoomId), content);
+  };
+
+  const handleSend = () => {
+    if (hasSendingMessage) return;
+    const content = input.trim();
+    if (!content) return;
+
+    sendContent(content);
     setInput("");
+  };
+
+  const retryMessage = (message: LocalChatMessage) => {
+    if (!message.clientId) return;
+    sendContent(message.content, message.clientId);
   };
 
   const grouped = groupByDate(messages);
@@ -179,7 +269,7 @@ export default function ChatRoomPage() {
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5 text-xs text-gray-400">
               <span className={`w-2 h-2 rounded-full ${connected ? "bg-green-400" : "bg-gray-300"}`} />
-              {connected ? "연결됨" : "연결 중..."}
+              {connected ? "연결됨" : "재연결 중..."}
             </div>
             <button
               onClick={handleLeave}
@@ -194,9 +284,40 @@ export default function ChatRoomPage() {
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {loading ? (
-          <div className="text-center py-12 text-gray-500">불러오는 중...</div>
+          <div className="space-y-4 py-4">
+            <div className="mx-auto flex w-fit items-center gap-2 rounded-full bg-orange-50 px-4 py-2 text-sm font-semibold text-[var(--getchu-orange-strong)]">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              메시지 불러오는 중이에요...
+            </div>
+            <div className="flex justify-start">
+              <div className="skeleton h-11 w-48 rounded-[1.35rem]" />
+            </div>
+            <div className="flex justify-end">
+              <div className="skeleton h-11 w-56 rounded-[1.35rem]" />
+            </div>
+            <div className="flex justify-start">
+              <div className="skeleton h-11 w-40 rounded-[1.35rem]" />
+            </div>
+          </div>
+        ) : loadError ? (
+          <ErrorState
+            title="메시지를 불러오지 못했어요"
+            description={loadError}
+            actionLabel="다시 불러오기"
+            onAction={() => {
+              setLoading(true);
+              setLoadError("");
+              chatApi.getMessages(Number(chatRoomId))
+                .then((res) => setMessages([...res.content].reverse()))
+                .catch(() => setLoadError("메시지를 불러오지 못했어요. 잠시 후 다시 시도해주세요."))
+                .finally(() => setLoading(false));
+            }}
+          />
         ) : messages.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">첫 메시지를 보내보세요</div>
+          <EmptyState
+            title="아직 메시지가 없어요"
+            description="첫 인사를 보내면 거래 이야기가 시작돼요."
+          />
         ) : (
           grouped.map((item, idx) => {
             if (item.type === "date") {
@@ -213,46 +334,16 @@ export default function ChatRoomPage() {
             const isMe = msg.senderId === user?.id;
 
             return (
-              <div key={msg.messageId} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                {/* 상대방: 프로필 이미지 + 닉네임 */}
-                {!isMe && (
-                  <div className="flex items-start gap-2 max-w-[75%]">
-                    <div className="w-8 h-8 rounded-full bg-gray-200 shrink-0 mt-1 overflow-hidden">
-                      {opponent?.opponentProfileImageUrl ? (
-                        <img
-                          src={opponent.opponentProfileImageUrl ?? ""}
-                          alt=""
-                          style={{ width: "32px", height: "32px", objectFit: "cover", borderRadius: "50%", display: "block" }}
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <User className="w-4 h-4 text-gray-400" />
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-600 mb-1">{msg.senderNickname}</p>
-                      <div className="flex items-end gap-1">
-                        <div className="px-4 py-2 rounded-2xl bg-gray-100 text-gray-900">
-                          <p className="text-sm">{msg.content}</p>
-                        </div>
-                        <p className="text-xs text-gray-400 shrink-0">{formatTime(msg.createdAt)}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 내 메시지 */}
-                {isMe && (
-                  <div className="flex items-end gap-1 max-w-[75%]">
-                    <p className="text-xs text-gray-400 shrink-0">{formatTime(msg.createdAt)}</p>
-                    <div className="px-4 py-2 rounded-2xl bg-[var(--getchu-orange)] text-white">
-                      <p className="text-sm">{msg.content}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <MessageBubble
+                key={msg.clientId ?? msg.messageId}
+                content={msg.content}
+                time={formatTime(msg.createdAt)}
+                isMe={isMe}
+                senderNickname={msg.senderNickname}
+                opponentProfileImageUrl={opponent?.opponentProfileImageUrl}
+                status={msg.deliveryStatus}
+                onRetry={() => retryMessage(msg)}
+              />
             );
           })
         )}
@@ -264,7 +355,8 @@ export default function ChatRoomPage() {
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="메시지를 입력하세요"
+            placeholder={connected ? "메시지를 입력하세요" : "채팅 연결을 기다리는 중이에요"}
+            disabled={!connected || hasSendingMessage}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -272,10 +364,17 @@ export default function ChatRoomPage() {
               }
             }}
           />
-          <Button onClick={handleSend} className="bg-[var(--getchu-orange)] hover:bg-[var(--getchu-orange-strong)] px-4">
-            <Send className="w-5 h-5" />
+          <Button
+            onClick={handleSend}
+            disabled={!connected || hasSendingMessage || !input.trim()}
+            className="bg-[var(--getchu-orange)] px-4 hover:bg-[var(--getchu-orange-strong)] disabled:opacity-60"
+          >
+            {hasSendingMessage ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="w-5 h-5" />}
           </Button>
         </div>
+        {!connected ? (
+          <p className="mt-2 text-center text-xs text-gray-400">연결이 돌아오면 바로 메시지를 보낼 수 있어요.</p>
+        ) : null}
       </div>
     </div>
   );
