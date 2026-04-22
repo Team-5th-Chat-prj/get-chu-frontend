@@ -1,13 +1,15 @@
-import { ChevronRight, Home, MessageCircle, User } from "lucide-react";
+import { ChevronRight, Home, MapPin, MessageCircle, User } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Button } from "../components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
 import { useEffect } from "react";
 import foxHeadImage from "../../assets/logo-fox-head.png";
+import { getVerifiedLocation } from "../utils/verifiedLocation";
 
 export default function MyPage() {
   const navigate = useNavigate();
   const { user, logout, refreshUser } = useAuth();
+  const verifiedLocation = getVerifiedLocation(user?.id);
 
   useEffect(() => {
     refreshUser().catch(() => {});
@@ -69,6 +71,24 @@ export default function MyPage() {
         <Button variant="outline" className="w-full border-gray-300" onClick={() => navigate("/my/profile/edit")}>
           프로필 수정
         </Button>
+
+        <Button
+          variant="outline"
+          className="mt-3 w-full border-orange-200 bg-orange-50/70 text-[var(--getchu-orange-strong)] hover:bg-orange-100"
+          onClick={() => navigate("/location/verify")}
+        >
+          <MapPin className="h-4 w-4" />
+          {verifiedLocation ? "동네 다시 인증하기" : "동네 인증하기"}
+        </Button>
+        {verifiedLocation ? (
+          <div className="mt-3 rounded-[1.2rem] border border-orange-100 bg-white px-4 py-3 text-sm text-gray-700">
+            <div className="flex items-center gap-2 font-semibold text-[var(--getchu-orange-strong)]">
+              <MapPin className="h-4 w-4" />
+              인증된 동네
+            </div>
+            <p className="mt-1 font-bold text-gray-950">{verifiedLocation.locationName}</p>
+          </div>
+        ) : null}
       </div>
 
       <div className="border-t border-gray-200 py-2">

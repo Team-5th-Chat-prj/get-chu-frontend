@@ -23,7 +23,7 @@ export default function ErrorState({
       actionLabel={actionLabel}
       onAction={onAction}
       mascotImage={mascotImage}
-      mascotAlt="헷갈린 표정의 여우"
+      mascotAlt="당황한 표정의 여우"
     />
   );
 }
