@@ -3,6 +3,7 @@ import {
   ArrowRight,
   Heart,
   Home,
+  MapPin,
   MessageCircle,
   PackageSearch,
   Search,
@@ -620,6 +621,14 @@ export default function HomePage() {
                     }`}
                   >
                     찜 {isAuthenticated ? likedCount : "로그인"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/nearby")}
+                    className="col-span-2 inline-flex items-center justify-center gap-2 rounded-full bg-white px-3 py-2 text-sm font-semibold text-[var(--getchu-orange-strong)] ring-1 ring-orange-100 transition hover:bg-orange-50"
+                  >
+                    <MapPin className="size-4" />
+                    내 근처 상품
                   </button>
                 </div>
               </div>

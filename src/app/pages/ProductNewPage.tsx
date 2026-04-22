@@ -10,9 +10,12 @@ import { productsApi } from "../api/products";
 import { Category } from "../types";
 import axios from "axios";
 import { resizeToBase64 } from "../utils/imageUtils";
+import { useAuth } from "../contexts/AuthContext";
+import { getVerifiedLocation } from "../utils/verifiedLocation";
 
 export default function ProductNewPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [title, setTitle] = useState("");
@@ -32,6 +35,25 @@ export default function ProductNewPage() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    const hasToken = Boolean(localStorage.getItem("accessToken"));
+
+    if (!hasToken) {
+      toast.error("로그인이 필요합니다.");
+      navigate("/login");
+      return;
+    }
+
+    if (!user) {
+      return;
+    }
+
+    if (!getVerifiedLocation(user.id)) {
+      toast.info("상품을 등록하려면 동네 인증이 먼저 필요해요.");
+      navigate("/location/verify");
+    }
+  }, [navigate, user]);
+
   const handleImageFiles = async (files: FileList) => {
     const remaining = 10 - imageUrls.length;
     if (remaining <= 0) { toast.error("사진은 최대 10장까지 가능합니다"); return; }
@@ -45,6 +67,12 @@ export default function ProductNewPage() {
   };
 
   const handleSubmit = async () => {
+    if (!user || !getVerifiedLocation(user.id)) {
+      toast.info("상품을 등록하려면 동네 인증이 먼저 필요해요.");
+      navigate("/location/verify");
+      return;
+    }
+
     if (!title.trim() || title.length < 2) {
       toast.error("제목은 2자 이상 입력해주세요"); return;
     }

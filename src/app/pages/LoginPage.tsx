@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import axios from "axios";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -24,7 +24,9 @@ function isValidEmail(value: string) {
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
+  const locationState = location.state as { afterSignup?: boolean; redirectTo?: string } | null;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [validationErrors, setValidationErrors] = useState<LoginValidationErrors>({});
@@ -60,8 +62,9 @@ export default function LoginPage() {
 
     try {
       await login(email.trim(), password);
-      setSuccessMessage("로그인됐어요! 홈으로 이동할게요.");
-      window.setTimeout(() => navigate("/"), 450);
+      const nextPath = locationState?.redirectTo ?? "/";
+      setSuccessMessage(locationState?.afterSignup ? "로그인됐어요! 동네 인증으로 이어갈게요." : "로그인됐어요! 홈으로 이동할게요.");
+      window.setTimeout(() => navigate(nextPath, { replace: true }), 450);
     } catch (err: any) {
       if (axios.isAxiosError(err) && err.response) {
         setFormError(err.response.data.message || "이메일 또는 비밀번호를 다시 확인해주세요.");
@@ -162,7 +165,9 @@ export default function LoginPage() {
               </p>
               <h2 className="mt-3 text-3xl font-bold text-[var(--getchu-ink)]">다시 만나서 반가워요.</h2>
               <p className="mt-3 text-sm leading-6 text-[var(--muted-foreground)]">
-                계정에 로그인하고 관심 상품과 채팅 흐름을 이어가 보세요.
+                {locationState?.afterSignup
+                  ? "로그인 후 동네를 인증하면 가까운 상품을 바로 만날 수 있어요."
+                  : "계정에 로그인하고 관심 상품과 채팅 흐름을 이어가 보세요."}
               </p>
             </div>
 

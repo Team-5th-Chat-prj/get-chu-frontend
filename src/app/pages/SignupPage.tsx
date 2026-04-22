@@ -118,9 +118,14 @@ export default function SignupPage() {
 
     try {
       await signup(email.trim(), password, nickname.trim(), profileImageUrl || undefined);
-      setSuccessMessage("회원가입이 완료됐어요! 로그인 페이지로 이동할게요.");
+      setSuccessMessage("회원가입이 완료됐어요! 로그인 후 동네 인증을 이어갈게요.");
       setIsLoading(false);
-      window.setTimeout(() => navigate("/login"), 900);
+      window.setTimeout(() => navigate("/login", {
+        state: {
+          afterSignup: true,
+          redirectTo: "/location/verify",
+        },
+      }), 900);
     } catch (err: any) {
       if (axios.isAxiosError(err) && err.response) {
         const { data } = err.response;
