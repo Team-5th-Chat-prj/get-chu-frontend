@@ -479,7 +479,7 @@ export default function HomePage() {
                   귀엽고 믿음 가는 분위기로, 데스크톱에서도 넓게 탐색해요.
                 </h2>
                 <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted-foreground)] sm:text-base">
-                  인기 상품부터 예약 진행 중인 물건까지 한눈에 보고, 필요한 거래를 더 빠르게 찾을 수 있게
+                  인기 상품부터 마켓에서 예약된 물건까지 한눈에 보고, 필요한 거래를 더 빠르게 찾을 수 있게
                   정리했어요.
                 </p>
               </div>
@@ -588,7 +588,7 @@ export default function HomePage() {
                 <p className="mt-2 text-3xl font-bold text-[var(--getchu-orange-strong)]">{filteredProducts.length}</p>
               </div>
               <div className="rounded-[1.4rem] bg-white p-4 shadow-sm">
-                <p className="text-sm text-[var(--muted-foreground)]">예약 진행</p>
+                <p className="text-sm text-[var(--muted-foreground)]">전체 예약 상품</p>
                 <p className="mt-2 text-2xl font-semibold text-[var(--getchu-ink)]">{reservedCount}</p>
               </div>
               <div className="rounded-[1.4rem] bg-white p-4 shadow-sm">

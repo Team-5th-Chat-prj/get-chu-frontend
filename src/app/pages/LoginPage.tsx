@@ -64,7 +64,10 @@ export default function LoginPage() {
       await login(email.trim(), password);
       const nextPath = locationState?.redirectTo ?? "/";
       setSuccessMessage(locationState?.afterSignup ? "로그인됐어요! 동네 인증으로 이어갈게요." : "로그인됐어요! 홈으로 이동할게요.");
-      window.setTimeout(() => navigate(nextPath, { replace: true }), 450);
+      window.setTimeout(() => navigate(nextPath, {
+        replace: true,
+        state: locationState?.afterSignup ? { returnTo: "/", afterSignup: true } : undefined,
+      }), 450);
     } catch (err: any) {
       if (axios.isAxiosError(err) && err.response) {
         setFormError(err.response.data.message || "이메일 또는 비밀번호를 다시 확인해주세요.");

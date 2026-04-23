@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ArrowLeft, CheckCircle2, LocateFixed, MapPin, Search } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { locationApi } from "../api/location";
 import { useAuth } from "../contexts/AuthContext";
@@ -14,6 +14,8 @@ import { saveVerifiedLocation } from "../utils/verifiedLocation";
 import foxHeadImage from "../../assets/logo-fox-head.png";
 
 type VerifyMode = "gps" | "address";
+
+const MAX_GPS_ACCURACY_METERS = 1000;
 
 interface LocationCandidate {
   locationName: string;
@@ -114,7 +116,9 @@ async function searchAddressCandidates(address: string): Promise<LocationCandida
 
 export default function LocationVerifyPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const location = useLocation();
+  const { user, refreshUser } = useAuth();
+  const locationState = location.state as { returnTo?: string; afterSignup?: boolean } | null;
   const [mode, setMode] = useState<VerifyMode>("gps");
   const [address, setAddress] = useState("");
   const [loading, setLoading] = useState(false);
@@ -145,8 +149,13 @@ export default function LocationVerifyPage() {
         locationName: result.locationName,
         locationRadius: result.locationRadius,
       });
+      await refreshUser().catch(() => {});
       toast.success(`${result.locationName} 동네 인증이 완료됐어요`);
-      navigate(-1);
+      if (locationState?.returnTo) {
+        navigate(locationState.returnTo, { replace: true });
+      } else {
+        navigate(-1);
+      }
     } catch {
       setErrorMessage("동네 인증 저장에 실패했어요. 다시 시도해주세요.");
       toast.error("동네 인증 저장에 실패했어요.");
@@ -189,6 +198,15 @@ export default function LocationVerifyPage() {
     navigator.geolocation.getCurrentPosition(
       async ({ coords }) => {
         try {
+          if (coords.accuracy > MAX_GPS_ACCURACY_METERS) {
+            const message = `현재 위치 정확도가 낮아요. 직접 입력으로 동네를 확인해주세요. (오차 약 ${Math.round(coords.accuracy / 1000)}km)`;
+
+            setMode("address");
+            setErrorMessage(message);
+            toast.info(message);
+            return;
+          }
+
           const locationName = await resolveRegionName(coords.latitude, coords.longitude);
           handlePreviewSuccess({
             mode: "gps",

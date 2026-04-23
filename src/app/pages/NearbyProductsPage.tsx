@@ -143,6 +143,19 @@ export default function NearbyProductsPage() {
   }, [fetchNearbyProducts]);
 
   useEffect(() => {
+    if (user?.locationLat != null && user.locationLng != null) {
+      useLocationForProducts(
+        {
+          lat: user.locationLat,
+          lng: user.locationLng,
+          locationName: user.locationName ?? undefined,
+          source: "verified",
+        },
+        initialRadiusRef.current,
+      );
+      return () => clearMarkers();
+    }
+
     const verifiedLocation: StoredVerifiedLocation | null = getVerifiedLocation(user?.id);
 
     if (verifiedLocation) {
@@ -185,7 +198,7 @@ export default function NearbyProductsPage() {
     );
 
     return () => clearMarkers();
-  }, [clearMarkers, useLocationForProducts, user?.id]);
+  }, [clearMarkers, useLocationForProducts, user?.id, user?.locationLat, user?.locationLng, user?.locationName]);
 
   const handleRadiusChange = (nextRadius: number) => {
     setRadius(nextRadius);
@@ -198,6 +211,19 @@ export default function NearbyProductsPage() {
   };
 
   const retry = () => {
+    if (user?.locationLat != null && user.locationLng != null) {
+      useLocationForProducts(
+        {
+          lat: user.locationLat,
+          lng: user.locationLng,
+          locationName: user.locationName ?? undefined,
+          source: "verified",
+        },
+        radius,
+      );
+      return;
+    }
+
     const verifiedLocation = getVerifiedLocation(user?.id);
 
     if (verifiedLocation) {

@@ -361,6 +361,9 @@ export default function ProductDetailPage() {
                 <button
                   type="button"
                   onClick={handleLike}
+                  aria-label={isLiked ? "찜 취소" : "찜하기"}
+                  data-testid="product-like-button"
+                  data-liked={isLiked ? "true" : "false"}
                   className={`btn-interactive inline-flex h-14 shrink-0 items-center justify-center gap-2 rounded-full border px-5 transition ${
                     isLiked
                       ? "border-red-200 bg-red-50 text-red-500"
@@ -377,6 +380,7 @@ export default function ProductDetailPage() {
                   <Button
                     type="button"
                     onClick={() => navigate(`/products/${product.id}/edit`)}
+                    data-testid="product-edit-button"
                     className="h-14 flex-1 rounded-full bg-[var(--getchu-orange)] text-base font-semibold hover:bg-[var(--getchu-orange-strong)]"
                   >
                     <PencilLine className="mr-2 h-4 w-4" />
@@ -388,6 +392,7 @@ export default function ProductDetailPage() {
                       type="button"
                       variant="outline"
                       onClick={handleReserve}
+                      data-testid="product-reserve-button"
                       disabled={actionLoading || product.status !== "SALE"}
                       className="h-14 flex-1 rounded-full border-orange-200 text-base font-semibold text-[var(--getchu-orange-strong)] hover:bg-[var(--getchu-orange-pale)] disabled:opacity-45"
                     >
@@ -396,6 +401,7 @@ export default function ProductDetailPage() {
                     <Button
                       type="button"
                       onClick={handleChat}
+                      data-testid="product-chat-button"
                       disabled={actionLoading || product.status === "SOLD_OUT"}
                       className="h-14 flex-1 rounded-full bg-[var(--getchu-orange)] text-base font-semibold hover:bg-[var(--getchu-orange-strong)] disabled:opacity-45"
                     >
