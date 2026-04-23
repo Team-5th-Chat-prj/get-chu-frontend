@@ -97,6 +97,10 @@ export interface Member {
   averageRating: number;
   reviewCount: number;
   createdAt?: string;
+  locationName?: string | null;
+  locationRadius?: number | null;
+  locationLat?: number | null;
+  locationLng?: number | null;
 }
 
 /** GET /members/:id (MemberProfileResponse) */

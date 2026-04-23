@@ -48,7 +48,7 @@ export default function ProductNewPage() {
       return;
     }
 
-    if (!getVerifiedLocation(user.id)) {
+    if (!user.locationName && !getVerifiedLocation(user.id)) {
       toast.info("상품을 등록하려면 동네 인증이 먼저 필요해요.");
       navigate("/location/verify");
     }
@@ -67,7 +67,7 @@ export default function ProductNewPage() {
   };
 
   const handleSubmit = async () => {
-    if (!user || !getVerifiedLocation(user.id)) {
+    if (!user || (!user.locationName && !getVerifiedLocation(user.id))) {
       toast.info("상품을 등록하려면 동네 인증이 먼저 필요해요.");
       navigate("/location/verify");
       return;

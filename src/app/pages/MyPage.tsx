@@ -1,15 +1,35 @@
-import { ChevronRight, Home, MapPin, MessageCircle, User } from "lucide-react";
+import { ChevronRight, Home, Loader2, MapPin, MessageCircle, Trash2, User } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Button } from "../components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import foxHeadImage from "../../assets/logo-fox-head.png";
 import { getVerifiedLocation } from "../utils/verifiedLocation";
+import { membersApi } from "../api/members";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "../components/ui/alert-dialog";
 
 export default function MyPage() {
   const navigate = useNavigate();
   const { user, logout, refreshUser } = useAuth();
-  const verifiedLocation = getVerifiedLocation(user?.id);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const cachedLocation = getVerifiedLocation(user?.id);
+  const verifiedLocation = user?.locationName
+    ? {
+        locationName: user.locationName,
+        locationRadius: user.locationRadius ?? cachedLocation?.locationRadius,
+      }
+    : cachedLocation;
 
   useEffect(() => {
     refreshUser().catch(() => {});
@@ -18,6 +38,23 @@ export default function MyPage() {
   const handleLogout = () => {
     logout();
     navigate("/");
+  };
+
+  const handleDeleteAccount = async () => {
+    if (isDeletingAccount) return;
+
+    setIsDeletingAccount(true);
+    try {
+      await membersApi.deleteAccount();
+      toast.success("회원탈퇴가 완료됐어요.");
+      await logout();
+      navigate("/", { replace: true });
+    } catch (error) {
+      console.error("Delete account failed", error);
+      toast.error("회원탈퇴를 완료하지 못했어요. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   return (
@@ -164,6 +201,51 @@ export default function MyPage() {
         <Button onClick={handleLogout} variant="outline" className="w-full border-gray-300 text-gray-700">
           로그아웃
         </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-red-100 bg-red-50/40 text-red-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+            >
+              <Trash2 className="h-4 w-4" />
+              회원탈퇴
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent className="rounded-[1.75rem] border-orange-100 bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.16)]">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-xl font-bold text-gray-950">정말 떠나시겠어요?</AlertDialogTitle>
+              <AlertDialogDescription className="leading-6 text-gray-600">
+                탈퇴하면 현재 계정으로 다시 로그인할 수 없어요. 판매글, 찜, 채팅 등 계정과 연결된 정보에도 영향을 줄 수 있어요.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="rounded-[1.25rem] border border-orange-100 bg-orange-50/60 px-4 py-3 text-sm text-[var(--getchu-orange-strong)]">
+              잠깐만요. 실수로 누른 거라면 취소를 눌러주세요.
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeletingAccount} className="rounded-full">
+                취소
+              </AlertDialogCancel>
+              <AlertDialogAction
+                disabled={isDeletingAccount}
+                onClick={(event) => {
+                  event.preventDefault();
+                  handleDeleteAccount();
+                }}
+                className="rounded-full bg-red-500 text-white hover:bg-red-600"
+              >
+                {isDeletingAccount ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    탈퇴 처리 중
+                  </>
+                ) : (
+                  "회원탈퇴"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       <nav className="fixed bottom-0 left-0 right-0 border-t border-orange-100 bg-white/90 backdrop-blur-xl md:hidden">
