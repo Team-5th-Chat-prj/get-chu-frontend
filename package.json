@@ -6,9 +6,18 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
-    "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e": "pnpm run test:e2e:functional",
+    "test:e2e:positive": "playwright test tests/e2e/api-contract-smoke.spec.ts tests/e2e/auth-login.spec.ts tests/e2e/chat-flow.spec.ts tests/e2e/like-flow.spec.ts tests/e2e/my-page.spec.ts tests/e2e/product-detail-auth.spec.ts tests/e2e/product-new-guard.spec.ts tests/e2e/search-flow.spec.ts tests/e2e/seed-health.spec.ts tests/e2e/seller-product-management.spec.ts",
+    "test:e2e:functional": "playwright test tests/e2e/api-contract-smoke.spec.ts tests/e2e/auth-login.spec.ts tests/e2e/chat-flow.spec.ts tests/e2e/like-flow.spec.ts tests/e2e/my-page.spec.ts tests/e2e/password-negative.spec.ts tests/e2e/private-api-negative.spec.ts tests/e2e/product-detail-auth.spec.ts tests/e2e/product-detail-negative.spec.ts tests/e2e/product-form-negative.spec.ts tests/e2e/product-new-guard.spec.ts tests/e2e/route-guard.spec.ts tests/e2e/search-flow.spec.ts tests/e2e/seed-health.spec.ts tests/e2e/seller-product-management.spec.ts tests/e2e/signup-negative.spec.ts tests/e2e/auth-negative.spec.ts",
+    "test:e2e:negative": "playwright test tests/e2e/auth-negative.spec.ts tests/e2e/signup-negative.spec.ts tests/e2e/route-guard.spec.ts tests/e2e/private-api-negative.spec.ts tests/e2e/product-detail-negative.spec.ts tests/e2e/product-form-negative.spec.ts tests/e2e/password-negative.spec.ts",
+    "test:e2e:headed": "pnpm run test:e2e:functional -- --headed",
+    "test:e2e:ui": "pnpm run test:e2e:functional -- --ui",
+    "test:e2e:demo": "playwright test -c playwright.demo.config.ts tests/e2e/demo-presentation.spec.ts",
+    "test:e2e:demo:journey": "playwright test -c playwright.demo.config.ts tests/e2e/demo-onboarding-chat-reserve.spec.ts",
+    "test:e2e:demo:chat": "playwright test -c playwright.demo.config.ts tests/e2e/demo-chat-dual-window.spec.ts",
+    "test:e2e:demo:trade": "playwright test -c playwright.demo.config.ts tests/e2e/demo-my-page-trade-review.spec.ts",
+    "test:e2e:demo:flow": "pnpm run test:e2e:demo:journey && pnpm run test:e2e:demo:trade",
+    "test:e2e:demo:all": "playwright test -c playwright.demo.config.ts tests/e2e/demo-presentation.spec.ts tests/e2e/demo-onboarding-chat-reserve.spec.ts tests/e2e/demo-chat-dual-window.spec.ts tests/e2e/demo-my-page-trade-review.spec.ts"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "1.2.3",

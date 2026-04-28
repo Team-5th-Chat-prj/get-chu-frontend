@@ -230,6 +230,7 @@ export default function MyProductsPage() {
                 key={tab.key}
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
+                data-testid={`seller-products-tab-${tab.key}`}
                 className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                   activeTab === tab.key
                     ? "bg-[var(--getchu-orange)] text-white shadow-[0_12px_24px_rgba(249,115,22,0.22)]"
@@ -269,6 +270,7 @@ export default function MyProductsPage() {
                   return (
                     <article
                       key={product.id}
+                      data-testid={`seller-product-card-${product.id}`}
                       className="rounded-[28px] border border-[var(--getchu-border)] bg-white p-4 shadow-[0_12px_32px_rgba(148,163,184,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_42px_rgba(148,163,184,0.14)] sm:p-5"
                     >
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -342,6 +344,7 @@ export default function MyProductsPage() {
                                 type="button"
                                 disabled={actionLoading === product.tradeId}
                                 onClick={() => handleTradeStatus(product.tradeId!, "TRADING")}
+                                data-testid={`seller-confirm-trade-button-${product.id}`}
                                 className="w-full bg-[var(--getchu-orange)] hover:bg-[var(--getchu-orange-strong)]"
                               >
                                 거래 확정
@@ -351,6 +354,7 @@ export default function MyProductsPage() {
                                 variant="outline"
                                 disabled={actionLoading === product.tradeId}
                                 onClick={() => handleTradeStatus(product.tradeId!, "SALE")}
+                                data-testid={`seller-cancel-reserve-button-${product.id}`}
                                 className="w-full border-orange-200 text-[var(--getchu-orange-strong)]"
                               >
                                 예약 취소

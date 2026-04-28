@@ -37,7 +37,11 @@ export default function ProductCard({ product }: { product: ProductCardItem }) {
   const status = statusMeta[product.status] ?? statusMeta.SALE;
 
   return (
-    <Link to={`/products/${product.id}`} className="card-hover group flex h-full flex-col overflow-hidden rounded-[1.8rem] border border-orange-100 bg-white">
+    <Link
+      to={`/products/${product.id}`}
+      data-testid={`product-card-${product.id}`}
+      className="card-hover group flex h-full flex-col overflow-hidden rounded-[1.8rem] border border-orange-100 bg-white"
+    >
       <div className="relative aspect-[0.95] overflow-hidden bg-[linear-gradient(180deg,#fff6ec,#fff1e1)]">
         {imageUrl ? (
           <img

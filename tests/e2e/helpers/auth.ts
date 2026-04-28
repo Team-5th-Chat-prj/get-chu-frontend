@@ -6,12 +6,14 @@ export async function loginAs(page: Page, account: TestAccount = "buyer") {
   await page.goto("/login");
   await page.locator("#email").fill(`${account}@test.com`);
   await page.locator("#password").fill("Test1234!");
+  const submitButton = page.locator('button[type="submit"]').last();
 
   const loginResponsePromise = page
     .waitForResponse((response) => response.url().includes("/api/auth/login"), { timeout: 15_000 })
     .catch(() => null);
 
-  await page.locator('form button[type="submit"]').click();
+  await submitButton.scrollIntoViewIfNeeded();
+  await submitButton.click({ force: true });
 
   const loginResponse = await loginResponsePromise;
   expect(loginResponse, "Login API did not respond. Check that the backend is running.").not.toBeNull();

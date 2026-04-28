@@ -6,29 +6,36 @@ const baseURL = process.env.E2E_BASE_URL ?? `http://${host}:${port}`;
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  timeout: 30_000,
+  timeout: 120_000,
+  globalTimeout: 300_000,
   expect: {
-    timeout: 10_000,
+    timeout: 15_000,
   },
-  // E2E tests share the same local backend DB, so keep them sequential.
   fullyParallel: false,
   workers: 1,
-  forbidOnly: Boolean(process.env.CI),
-  retries: process.env.CI ? 2 : 0,
+  forceExit: true,
   reporter: [
     ["list"],
     ["html", { open: "never" }],
   ],
   use: {
     baseURL,
-    trace: "on-first-retry",
+    trace: "on",
     screenshot: "only-on-failure",
-    video: "retain-on-failure",
+    video: {
+      mode: "on",
+      size: { width: 1600, height: 900 },
+    },
+    headless: false,
+    launchOptions: {
+      slowMo: 450,
+    },
+    viewport: { width: 1600, height: 900 },
   },
   webServer: {
     command: `pnpm dev --host ${host} --port ${port}`,
     url: baseURL,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
     timeout: 120_000,
   },
   projects: [
