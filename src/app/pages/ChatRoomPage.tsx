@@ -5,7 +5,8 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { toast } from "sonner";
 import { chatApi } from "../api/chat";
-import { ChatMessage } from "../types";
+import { productsApi } from "../api/products";
+import { ChatMessage, ProductDetail } from "../types";
 import { useAuth } from "../contexts/AuthContext";
 import { useStompChat } from "../hooks/useStompChat";
 import { useChatContext } from "../contexts/ChatContext";
@@ -18,9 +19,15 @@ type LocalChatMessage = ChatMessage & {
   deliveryStatus?: "sending" | "failed";
 };
 
+function parseChatDate(dateStr: string) {
+  const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/.test(dateStr);
+  const normalizedFraction = dateStr.replace(/\.(\d{3})\d+$/, ".$1");
+  return new Date(hasTimezone ? normalizedFraction : `${normalizedFraction}Z`);
+}
+
 // 날짜 구분선용 포맷
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("ko-KR", {
+  return parseChatDate(dateStr).toLocaleDateString("ko-KR", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -28,7 +35,7 @@ function formatDate(dateStr: string) {
 }
 
 function formatTime(dateStr: string) {
-  return new Date(dateStr).toLocaleTimeString("ko-KR", {
+  return parseChatDate(dateStr).toLocaleTimeString("ko-KR", {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -49,6 +56,21 @@ function groupByDate(messages: LocalChatMessage[]) {
   return result;
 }
 
+const PRODUCT_STATUS_META = {
+  SALE: {
+    label: "예약 가능",
+    className: "bg-orange-100 text-[var(--getchu-orange-strong)]",
+  },
+  RESERVED: {
+    label: "예약중",
+    className: "bg-amber-100 text-amber-700",
+  },
+  SOLD_OUT: {
+    label: "판매완료",
+    className: "bg-gray-200 text-gray-700",
+  },
+} as const;
+
 export default function ChatRoomPage() {
   const navigate = useNavigate();
   const { chatRoomId } = useParams();
@@ -63,9 +85,18 @@ export default function ChatRoomPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [connected, setConnected] = useState(false);
+  const [productDetail, setProductDetail] = useState<ProductDetail | null>(null);
+  const [reserveLoading, setReserveLoading] = useState(false);
   const pendingRef = useRef<Map<string, { content: string; timeoutId: ReturnType<typeof setTimeout> }>>(new Map());
   const bottomRef = useRef<HTMLDivElement>(null);
   const hasSendingMessage = messages.some((message) => message.deliveryStatus === "sending");
+  const productStatusMeta = productDetail ? PRODUCT_STATUS_META[productDetail.status] : null;
+  const canReserveFromChat = Boolean(
+    productDetail &&
+    user &&
+    productDetail.sellerId !== user.id &&
+    productDetail.status === "SALE",
+  );
 
   // 채팅방 입장/퇴장 시 activeChatRoomId 설정 → 전역 STOMP에서 unread 증가 방지
   useEffect(() => {
@@ -103,6 +134,31 @@ export default function ChatRoomPage() {
       })
       .finally(() => setLoading(false));
   }, [chatRoomId]);
+
+  useEffect(() => {
+    if (!opponent?.productId) {
+      setProductDetail(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    productsApi.getProduct(opponent.productId)
+      .then((detail) => {
+        if (!cancelled) {
+          setProductDetail(detail);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setProductDetail(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [opponent?.productId]);
 
   const { sendMessage: stompSend } = useStompChat({
     chatRoomId: Number(chatRoomId),
@@ -252,6 +308,23 @@ export default function ChatRoomPage() {
     sendContent(message.content, message.clientId);
   };
 
+  const handleReserveFromChat = async () => {
+    if (!productDetail || !canReserveFromChat || reserveLoading) {
+      return;
+    }
+
+    setReserveLoading(true);
+    try {
+      const result = await productsApi.reserveProduct(productDetail.id);
+      setProductDetail((prev) => (prev ? { ...prev, status: "RESERVED" } : prev));
+      toast.success(`예약했어요. 판매자는 ${result.sellerNickname}님이에요.`);
+    } catch {
+      toast.error("채팅방에서 예약하지 못했어요. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setReserveLoading(false);
+    }
+  };
+
   const grouped = groupByDate(messages);
 
   return (
@@ -283,6 +356,46 @@ export default function ChatRoomPage() {
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+        {productDetail ? (
+          <div className="mb-4 rounded-[1.35rem] border border-orange-100 bg-orange-50/55 p-4 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[var(--getchu-orange-strong)] ring-1 ring-orange-100">
+                    채팅 중인 상품
+                  </span>
+                  {productStatusMeta ? (
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${productStatusMeta.className}`}>
+                      {productStatusMeta.label}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-3 truncate text-base font-semibold text-gray-950">{productDetail.title}</p>
+                <p className="mt-1 text-sm text-gray-600">{productDetail.price.toLocaleString()}원</p>
+              </div>
+
+              <div className="flex flex-col gap-2 sm:min-w-[180px]">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate(`/products/${productDetail.id}`)}
+                  className="border-orange-200 bg-white text-[var(--getchu-orange-strong)]"
+                >
+                  상품 상세 보기
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleReserveFromChat}
+                  disabled={!canReserveFromChat || reserveLoading}
+                  className="bg-[var(--getchu-orange)] text-white hover:bg-[var(--getchu-orange-strong)] disabled:opacity-55"
+                >
+                  {reserveLoading ? "예약하는 중..." : canReserveFromChat ? "이 채팅에서 예약하기" : "지금은 예약할 수 없어요"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {loading ? (
           <div className="space-y-4 py-4">
             <div className="mx-auto flex w-fit items-center gap-2 rounded-full bg-orange-50 px-4 py-2 text-sm font-semibold text-[var(--getchu-orange-strong)]">

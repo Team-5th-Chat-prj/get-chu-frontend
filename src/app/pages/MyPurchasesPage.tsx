@@ -175,6 +175,7 @@ export default function MyPurchasesPage() {
                 key={tab.key}
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
+                data-testid={`buyer-trades-tab-${tab.key}`}
                 className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                   activeTab === tab.key
                     ? "bg-[var(--getchu-orange)] text-white shadow-[0_12px_24px_rgba(249,115,22,0.22)]"
@@ -213,6 +214,7 @@ export default function MyPurchasesPage() {
                   return (
                     <article
                       key={trade.tradeId}
+                      data-testid={`buyer-trade-card-${trade.tradeId}`}
                       className="rounded-[28px] border border-[var(--getchu-border)] bg-white p-4 shadow-[0_12px_32px_rgba(148,163,184,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_42px_rgba(148,163,184,0.14)] sm:p-5"
                     >
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -256,6 +258,7 @@ export default function MyPurchasesPage() {
                                 type="button"
                                 disabled={actionLoading === trade.tradeId}
                                 onClick={() => handleComplete(trade.tradeId)}
+                                data-testid={`buyer-complete-trade-button-${trade.tradeId}`}
                                 className="w-full bg-[var(--getchu-orange)] hover:bg-[var(--getchu-orange-strong)]"
                               >
                                 거래 완료 확인
@@ -276,6 +279,7 @@ export default function MyPurchasesPage() {
                               <Button
                                 type="button"
                                 onClick={() => navigate(`/trades/${trade.tradeId}/review`)}
+                                data-testid={`buyer-write-review-button-${trade.tradeId}`}
                                 className="w-full bg-[var(--getchu-orange)] hover:bg-[var(--getchu-orange-strong)]"
                               >
                                 <MessageSquareText className="mr-2 h-4 w-4" />
