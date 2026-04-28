@@ -3,6 +3,7 @@ import {
   ArrowRight,
   Heart,
   Home,
+  MapPin,
   MessageCircle,
   PackageSearch,
   Search,
@@ -12,12 +13,15 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../contexts/AuthContext";
+import { membersApi } from "../api/members";
 import { productsApi } from "../api/products";
 import { ProductSummary } from "../types";
 import { toast } from "sonner";
 import logoImage from "../../assets/logo.png";
 import foxHeadImage from "../../assets/logo-fox-head.png";
-import FeedbackState from "../components/FeedbackState";
+import EmptyState from "../components/ui/state/EmptyState";
+import ErrorState from "../components/ui/state/ErrorState";
+import LoadingState from "../components/ui/state/LoadingState";
 
 const categories = ["전체", "디지털기기", "생활가전", "가구/인테리어", "패션", "도서", "스포츠/레저", "기타"];
 
@@ -37,17 +41,18 @@ const STATUS_BADGE: Record<string, { label: string; color: string }> = {
   SOLD_OUT: { label: "판매완료", color: "bg-stone-300 text-stone-600" },
 };
 
-function SkeletonCard() {
-  return (
-    <div className="overflow-hidden rounded-[1.6rem] border border-orange-100 bg-white">
-      <div className="skeleton aspect-[0.95]" />
-      <div className="space-y-3 p-4">
-        <div className="skeleton h-4 w-1/2" />
-        <div className="skeleton h-6 w-4/5" />
-        <div className="skeleton h-4 w-2/5" />
-      </div>
-    </div>
-  );
+type FeedProduct = ProductSummary & { isLiked?: boolean; isMine?: boolean };
+
+function applyFeedState(
+  products: ProductSummary[],
+  likedProductIds: Set<number>,
+  myProductIds: Set<number>,
+): FeedProduct[] {
+  return products.map((product) => ({
+    ...product,
+    isLiked: likedProductIds.has(product.id),
+    isMine: myProductIds.has(product.id),
+  }));
 }
 
 function ProductCard({
@@ -55,7 +60,7 @@ function ProductCard({
   onNavigate,
   onLike,
 }: {
-  product: ProductSummary & { isLiked?: boolean };
+  product: FeedProduct;
   onNavigate: (id: number) => void;
   onLike: (e: React.MouseEvent, id: number) => void;
 }) {
@@ -83,13 +88,20 @@ function ProductCard({
           <span className={`rounded-full px-3 py-1 text-xs font-semibold shadow-sm ${badge.color}`}>
             {badge.label}
           </span>
-          <button
-            onClick={(e) => onLike(e, product.id)}
-            className="btn-interactive flex size-9 items-center justify-center rounded-full bg-white/88 text-stone-500 shadow-sm"
-            aria-label="찜하기"
-          >
-            <Heart className={`size-4 ${product.isLiked ? "fill-red-500 text-red-500" : ""}`} />
-          </button>
+          {product.isMine ? (
+            <span className="rounded-full bg-white/88 px-3 py-1 text-xs font-semibold text-[var(--getchu-orange-strong)] shadow-sm">
+              내 상품
+            </span>
+          ) : (
+            <button
+              onClick={(e) => onLike(e, product.id)}
+              className="btn-interactive flex items-center gap-1 rounded-full bg-white/88 px-3 py-2 text-xs font-semibold text-stone-500 shadow-sm"
+              aria-label="찜하기"
+            >
+              <Heart className={`size-4 ${product.isLiked ? "fill-red-500 text-red-500" : ""}`} />
+              <span>{product.likeCount ?? 0}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -124,7 +136,7 @@ export default function HomePage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState("전체");
-  const [products, setProducts] = useState<(ProductSummary & { isLiked?: boolean })[]>([]);
+  const [products, setProducts] = useState<FeedProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [popularKeywords, setPopularKeywords] = useState<string[]>([]);
@@ -133,12 +145,41 @@ export default function HomePage() {
   const [suggestions, setSuggestions] = useState<ProductSummary[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchMode, setSearchMode] = useState(false);
-  const [searchResults, setSearchResults] = useState<ProductSummary[]>([]);
+  const [searchResults, setSearchResults] = useState<FeedProduct[]>([]);
+  const [likedMode, setLikedMode] = useState(false);
+  const [likedProducts, setLikedProducts] = useState<FeedProduct[]>([]);
+  const [likedCount, setLikedCount] = useState(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const fetchLikedProductIds = useCallback(async () => {
+    if (!isAuthenticated) {
+      return new Set<number>();
+    }
+
+    try {
+      const likes = await membersApi.getMyLikes({ size: 200 });
+      return new Set(likes.content.map((product) => product.id));
+    } catch {
+      return new Set<number>();
+    }
+  }, [isAuthenticated]);
+
+  const fetchMyProductIds = useCallback(async () => {
+    if (!isAuthenticated) {
+      return new Set<number>();
+    }
+
+    try {
+      const myProducts = await membersApi.getMyProducts({ size: 200 });
+      return new Set(myProducts.content.map((product) => product.id));
+    } catch {
+      return new Set<number>();
+    }
+  }, [isAuthenticated]);
+
   const fetchProducts = useCallback(async () => {
-    if (searchMode) {
+    if (searchMode || likedMode) {
       return;
     }
 
@@ -147,19 +188,21 @@ export default function HomePage() {
 
     try {
       const categoryId = selectedCategory === "전체" ? undefined : CATEGORY_ID_MAP[selectedCategory];
-      const [saleRes, reservedRes] = await Promise.all([
+      const [saleRes, reservedRes, likedProductIds, myProductIds] = await Promise.all([
         productsApi.getProducts({ size: 50, categoryId }),
         productsApi.getProducts({ size: 50, status: "RESERVED", categoryId }),
+        fetchLikedProductIds(),
+        fetchMyProductIds(),
       ]);
 
-      setProducts([...saleRes.content, ...reservedRes.content]);
+      setProducts(applyFeedState([...saleRes.content, ...reservedRes.content], likedProductIds, myProductIds));
     } catch {
       setProducts([]);
       setErrorMessage("상품 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
     } finally {
       setLoading(false);
     }
-  }, [searchMode, selectedCategory]);
+  }, [fetchLikedProductIds, fetchMyProductIds, likedMode, searchMode, selectedCategory]);
 
   useEffect(() => {
     fetchProducts();
@@ -178,6 +221,19 @@ export default function HomePage() {
     () => products.filter((product) => product.status !== "SOLD_OUT"),
     [products],
   );
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setLikedCount(0);
+      setLikedProducts([]);
+      return;
+    }
+
+    membersApi
+      .getMyLikes({ size: 50 })
+      .then((likes) => setLikedCount(likes.content.length))
+      .catch(() => setLikedCount(0));
+  }, [isAuthenticated]);
 
   const handleKeywordChange = (value: string) => {
     setKeyword(value);
@@ -215,24 +271,63 @@ export default function HomePage() {
     setKeyword(searchTerm);
     setShowSuggestions(false);
     setSearchMode(true);
+    setLikedMode(false);
     setLoading(true);
     setErrorMessage("");
 
     try {
-      const data = await productsApi.searchProducts({ keyword: searchTerm, size: 50 });
-      setSearchResults(data.content);
+      const [data, likedProductIds, myProductIds] = await Promise.all([
+        productsApi.searchProducts({ keyword: searchTerm, size: 50 }),
+        fetchLikedProductIds(),
+        fetchMyProductIds(),
+      ]);
+      setSearchResults(applyFeedState(data.content, likedProductIds, myProductIds));
     } catch {
       setSearchResults([]);
       setErrorMessage("검색 결과를 가져오지 못했어요. 다시 시도해 주세요.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchLikedProductIds, fetchMyProductIds]);
+
+  const handleShowLikedProducts = useCallback(async () => {
+    if (!isAuthenticated) {
+      toast.error("로그인이 필요합니다.");
+      navigate("/login");
+      return;
+    }
+
+    setKeyword("");
+    setSearchMode(false);
+    setLikedMode(true);
+    setSearchResults([]);
+    setSuggestions([]);
+    setShowSuggestions(false);
+    setLoading(true);
+    setErrorMessage("");
+
+    try {
+      const [likes, myProductIds] = await Promise.all([
+        membersApi.getMyLikes({ size: 50 }),
+        fetchMyProductIds(),
+      ]);
+      const likedProductIds = new Set(likes.content.map((product) => product.id));
+      setLikedCount(likes.content.length);
+      setLikedProducts(applyFeedState(likes.content, likedProductIds, myProductIds));
+    } catch {
+      setLikedProducts([]);
+      setErrorMessage("찜한 상품을 불러오지 못했어요. 다시 시도해 주세요.");
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchMyProductIds, isAuthenticated, navigate]);
 
   const handleClearSearch = () => {
     setKeyword("");
     setSearchMode(false);
+    setLikedMode(false);
     setSearchResults([]);
+    setLikedProducts([]);
     setSuggestions([]);
     setShowSuggestions(false);
     setErrorMessage("");
@@ -247,11 +342,31 @@ export default function HomePage() {
       return;
     }
 
-    const product = products.find((item) => item.id === productId);
+    const product =
+      (likedMode ? likedProducts : searchMode ? searchResults : products).find((item) => item.id === productId) ??
+      products.find((item) => item.id === productId) ??
+      searchResults.find((item) => item.id === productId) ??
+      likedProducts.find((item) => item.id === productId);
 
     if (!product) {
       return;
     }
+
+    if (product.isMine) {
+      toast.info("내 상품은 찜할 수 없어요.");
+      return;
+    }
+
+    const nextIsLiked = !product.isLiked;
+    const optimisticLikeCount = Math.max(0, (product.likeCount ?? 0) + (nextIsLiked ? 1 : -1));
+    const updateProductLike = (item: FeedProduct, isLiked = nextIsLiked, likeCount = optimisticLikeCount): FeedProduct =>
+      item.id === productId
+        ? {
+            ...item,
+            isLiked,
+            likeCount,
+          }
+        : item;
 
     try {
       if (product.isLiked) {
@@ -260,23 +375,39 @@ export default function HomePage() {
         await productsApi.createLike(productId);
       }
 
-      setProducts((prev) =>
-        prev.map((item) =>
-          item.id === productId
-            ? {
-                ...item,
-                isLiked: !item.isLiked,
-                likeCount: (item.likeCount ?? 0) + (item.isLiked ? -1 : 1),
-              }
-            : item,
-        ),
+      setProducts((prev) => prev.map((item) => updateProductLike(item)));
+      setSearchResults((prev) => prev.map((item) => updateProductLike(item)));
+      setLikedProducts((prev) =>
+        nextIsLiked
+          ? prev.map((item) => updateProductLike(item))
+          : prev.filter((item) => item.id !== productId),
       );
+      setLikedCount((prev) => Math.max(0, prev + (nextIsLiked ? 1 : -1)));
+
+      const [freshProduct, likedProductIds] = await Promise.all([
+        productsApi.getProduct(productId).catch(() => null),
+        fetchLikedProductIds(),
+      ]);
+      const syncedLikeCount = freshProduct?.likeCount ?? optimisticLikeCount;
+      const syncedIsLiked = likedProductIds.has(productId);
+      setProducts((prev) =>
+        prev.map((item) => updateProductLike(item, syncedIsLiked, syncedLikeCount)),
+      );
+      setSearchResults((prev) =>
+        prev.map((item) => updateProductLike(item, syncedIsLiked, syncedLikeCount)),
+      );
+      setLikedProducts((prev) =>
+        syncedIsLiked
+          ? prev.map((item) => updateProductLike(item, syncedIsLiked, syncedLikeCount))
+          : prev.filter((item) => item.id !== productId),
+      );
+      setLikedCount(likedProductIds.size);
     } catch {
       toast.error("찜 처리 중 문제가 발생했어요.");
     }
   };
 
-  const displayProducts = searchMode ? searchResults : filteredProducts;
+  const displayProducts = likedMode ? likedProducts : searchMode ? searchResults : filteredProducts;
   const reservedCount = products.filter((product) => product.status === "RESERVED").length;
 
   return (
@@ -348,7 +479,7 @@ export default function HomePage() {
                   귀엽고 믿음 가는 분위기로, 데스크톱에서도 넓게 탐색해요.
                 </h2>
                 <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted-foreground)] sm:text-base">
-                  인기 상품부터 예약 진행 중인 물건까지 한눈에 보고, 필요한 거래를 더 빠르게 찾을 수 있게
+                  인기 상품부터 마켓에서 예약된 물건까지 한눈에 보고, 필요한 거래를 더 빠르게 찾을 수 있게
                   정리했어요.
                 </p>
               </div>
@@ -410,7 +541,7 @@ export default function HomePage() {
               ) : null}
             </div>
 
-            {!searchMode && popularKeywords.length > 0 ? (
+            {!searchMode && !likedMode && popularKeywords.length > 0 ? (
               <div className="mt-5">
                 <div className="mb-3 flex items-center justify-between">
                   <p className="text-sm font-semibold text-[var(--getchu-ink)]">인기 검색어 TOP 10</p>
@@ -457,14 +588,48 @@ export default function HomePage() {
                 <p className="mt-2 text-3xl font-bold text-[var(--getchu-orange-strong)]">{filteredProducts.length}</p>
               </div>
               <div className="rounded-[1.4rem] bg-white p-4 shadow-sm">
-                <p className="text-sm text-[var(--muted-foreground)]">예약 진행</p>
+                <p className="text-sm text-[var(--muted-foreground)]">전체 예약 상품</p>
                 <p className="mt-2 text-2xl font-semibold text-[var(--getchu-ink)]">{reservedCount}</p>
               </div>
               <div className="rounded-[1.4rem] bg-white p-4 shadow-sm">
                 <p className="text-sm text-[var(--muted-foreground)]">현재 모드</p>
                 <div className="mt-2 flex items-center justify-between text-[var(--getchu-ink)]">
-                  <span className="text-lg font-semibold">{searchMode ? "검색 결과" : "추천 상품"}</span>
+                  <span className="text-lg font-semibold">
+                    {likedMode ? "찜한 상품" : searchMode ? "검색 결과" : "추천 상품"}
+                  </span>
                   <ArrowRight className="size-4 text-[var(--getchu-orange-strong)]" />
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleClearSearch}
+                    className={`rounded-full px-3 py-2 text-sm font-semibold transition ${
+                      !searchMode && !likedMode
+                        ? "bg-[var(--getchu-orange)] text-white shadow-[0_12px_22px_rgba(255,138,61,0.22)]"
+                        : "bg-[var(--getchu-orange-pale)] text-[var(--getchu-orange-strong)] hover:bg-orange-100"
+                    }`}
+                  >
+                    추천 상품
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleShowLikedProducts()}
+                    className={`rounded-full px-3 py-2 text-sm font-semibold transition ${
+                      likedMode
+                        ? "bg-red-500 text-white shadow-[0_12px_22px_rgba(248,113,113,0.22)]"
+                        : "bg-red-50 text-red-500 hover:bg-red-100"
+                    }`}
+                  >
+                    찜 {isAuthenticated ? likedCount : "로그인"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/nearby")}
+                    className="col-span-2 inline-flex items-center justify-center gap-2 rounded-full bg-white px-3 py-2 text-sm font-semibold text-[var(--getchu-orange-strong)] ring-1 ring-orange-100 transition hover:bg-orange-50"
+                  >
+                    <MapPin className="size-4" />
+                    내 근처 상품
+                  </button>
                 </div>
               </div>
             </div>
@@ -472,7 +637,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {!searchMode ? (
+      {!searchMode && !likedMode ? (
         <div className="app-shell px-4 pt-5">
           <div className="overflow-x-auto pb-1">
             <div className="flex gap-2">
@@ -495,39 +660,59 @@ export default function HomePage() {
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--getchu-orange-strong)]">
-              {searchMode ? "Search Results" : "Curated Items"}
+              {likedMode ? "Liked Items" : searchMode ? "Search Results" : "Curated Items"}
             </p>
             <h2 className="mt-2 text-2xl font-bold text-[var(--getchu-ink)]">
-              {searchMode ? `"${keyword}" 검색 결과` : "지금 둘러보기 좋은 상품"}
+              {likedMode ? "내가 찜한 상품" : searchMode ? `"${keyword}" 검색 결과` : "지금 둘러보기 좋은 상품"}
             </h2>
           </div>
           <p className="text-sm text-[var(--muted-foreground)]">
-            {searchMode ? `${searchResults.length}개의 결과` : `${filteredProducts.length}개의 상품`}
+            {likedMode
+              ? `${likedProducts.length}개의 찜`
+              : searchMode
+                ? `${searchResults.length}개의 결과`
+                : `${filteredProducts.length}개의 상품`}
           </p>
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-            {Array.from({ length: 8 }).map((_, index) => (
-              <SkeletonCard key={index} />
-            ))}
-          </div>
+          <LoadingState
+            mascotImage={foxHeadImage}
+            description={
+              likedMode
+                ? "찜해둔 상품을 모아보고 있어요."
+                : searchMode && keyword.trim()
+                  ? `"${keyword}"와 어울리는 상품을 모아보고 있어요.`
+                  : "여우가 마음에 드는 상품을 고르고 있어요."
+            }
+          />
         ) : errorMessage ? (
-          <FeedbackState
-            variant="error"
+          <ErrorState
+            mascotImage={foxHeadImage}
             title="화면을 준비하지 못했어요"
             description={errorMessage}
-            actionLabel={searchMode ? "검색 다시 시도" : "목록 다시 불러오기"}
+            actionLabel={likedMode ? "찜 목록 다시 불러오기" : searchMode ? "검색 다시 시도" : "목록 다시 불러오기"}
             onAction={() => {
-              if (searchMode && keyword.trim()) {
+              if (likedMode) {
+                void handleShowLikedProducts();
+              } else if (searchMode && keyword.trim()) {
                 void handleSearch(keyword);
               } else {
                 void fetchProducts();
               }
             }}
           />
+        ) : likedMode && displayProducts.length === 0 ? (
+          <EmptyState
+            mascotImage={foxHeadImage}
+            title="아직 찜한 상품이 없어요"
+            description="마음에 드는 상품의 하트를 눌러두면 여기에서 다시 볼 수 있어요."
+            actionLabel="전체 상품 보기"
+            onAction={handleClearSearch}
+          />
         ) : displayProducts.length === 0 ? (
-          <FeedbackState
+          <EmptyState
+            mascotImage={foxHeadImage}
             title={searchMode ? "검색 결과가 없어요" : "아직 등록된 상품이 없어요"}
             description={
               searchMode

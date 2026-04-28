@@ -1,57 +1,94 @@
-import { Heart } from "lucide-react";
+import { Heart, MapPin, PackageSearch, Sparkles } from "lucide-react";
 import { Link } from "react-router";
+import { ProductStatus } from "../types";
 
-interface Product {
+interface ProductCardItem {
   id: number;
   title: string;
   price: number;
-  status: "SALE" | "RESERVED" | "SOLD";
-  imageUrl?: string;
-  likeCount: number;
+  status: ProductStatus | "SOLD";
+  imageUrl?: string | null;
+  thumbnailUrl?: string | null;
+  likeCount?: number;
+  distanceKm?: number;
 }
 
-export default function ProductCard({ product }: { product: Product }) {
-  const statusLabels = {
-    SALE: "판매중",
-    RESERVED: "예약중",
-    SOLD: "판매완료",
-  };
+const statusMeta: Record<string, { label: string; className: string }> = {
+  SALE: {
+    label: "판매중",
+    className: "bg-[var(--getchu-orange)] text-white",
+  },
+  RESERVED: {
+    label: "예약중",
+    className: "bg-amber-400 text-white",
+  },
+  SOLD: {
+    label: "판매완료",
+    className: "bg-stone-300 text-stone-600",
+  },
+  SOLD_OUT: {
+    label: "판매완료",
+    className: "bg-stone-300 text-stone-600",
+  },
+};
 
-  const statusColors = {
-    SALE: "bg-green-500",
-    RESERVED: "bg-yellow-500",
-    SOLD: "bg-gray-500",
-  };
+export default function ProductCard({ product }: { product: ProductCardItem }) {
+  const imageUrl = product.thumbnailUrl ?? product.imageUrl;
+  const status = statusMeta[product.status] ?? statusMeta.SALE;
 
   return (
-    <Link to={`/products/${product.id}`} className="block">
-      <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-        <div className="aspect-square bg-gray-100 relative">
-          {product.imageUrl ? (
-            <img
-              src={product.imageUrl}
-              alt={product.title}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-gray-400">
-              이미지 없음
-            </div>
-          )}
-          <span
-            className={`absolute top-2 left-2 px-2 py-1 text-xs text-white rounded ${
-              statusColors[product.status]
-            }`}
-          >
-            {statusLabels[product.status]}
+    <Link
+      to={`/products/${product.id}`}
+      data-testid={`product-card-${product.id}`}
+      className="card-hover group flex h-full flex-col overflow-hidden rounded-[1.8rem] border border-orange-100 bg-white"
+    >
+      <div className="relative aspect-[0.95] overflow-hidden bg-[linear-gradient(180deg,#fff6ec,#fff1e1)]">
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={product.title}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-[var(--getchu-orange-strong)]">
+            <PackageSearch className="size-10" />
+          </div>
+        )}
+
+        <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 p-3">
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold shadow-sm ${status.className}`}>
+            {status.label}
           </span>
+          {typeof product.distanceKm === "number" ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-[var(--getchu-orange-strong)] shadow-sm">
+              <MapPin className="size-3" />
+              {product.distanceKm.toFixed(1)}km
+            </span>
+          ) : null}
         </div>
-        <div className="p-3">
-          <h3 className="font-medium text-sm line-clamp-1">{product.title}</h3>
-          <p className="text-base mt-1">{product.price.toLocaleString()}원</p>
-          <div className="flex items-center mt-2 text-gray-500 text-sm">
-            <Heart className="w-4 h-4 mr-1" />
-            <span>{product.likeCount}</span>
+      </div>
+
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-xs font-medium text-[var(--muted-foreground)]">
+            <Sparkles className="size-3.5 text-[var(--getchu-orange)]" />
+            <span>가까운 중고 거래</span>
+          </div>
+          <h3 className="line-clamp-2 text-base font-semibold text-[var(--getchu-ink)]">{product.title}</h3>
+        </div>
+
+        <div className="mt-auto flex items-end justify-between gap-3">
+          <div>
+            <p className="text-lg font-bold text-[var(--getchu-orange-strong)]">
+              {product.price.toLocaleString()}원
+            </p>
+            <div className="mt-1 flex items-center gap-1 text-xs text-[var(--muted-foreground)]">
+              <Heart className="size-3.5" />
+              <span>{product.likeCount ?? 0}</span>
+            </div>
+          </div>
+          <div className="rounded-full bg-[var(--getchu-orange-pale)] px-3 py-1 text-xs font-semibold text-[var(--getchu-orange-strong)]">
+            보러가기
           </div>
         </div>
       </div>

@@ -5,6 +5,9 @@ dist/
 *.zip
 .env
 .env.*
+!.env.example
 coverage/
+playwright-report/
+test-results/
 .DS_Store
 package-lock.json

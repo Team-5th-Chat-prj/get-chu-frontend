@@ -1,13 +1,35 @@
-import { ChevronRight, Home, MessageCircle, User } from "lucide-react";
+import { ChevronRight, Home, Loader2, MapPin, MessageCircle, Trash2, User } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Button } from "../components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import foxHeadImage from "../../assets/logo-fox-head.png";
+import { getVerifiedLocation } from "../utils/verifiedLocation";
+import { membersApi } from "../api/members";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "../components/ui/alert-dialog";
 
 export default function MyPage() {
   const navigate = useNavigate();
   const { user, logout, refreshUser } = useAuth();
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const cachedLocation = getVerifiedLocation(user?.id);
+  const verifiedLocation = user?.locationName
+    ? {
+        locationName: user.locationName,
+        locationRadius: user.locationRadius ?? cachedLocation?.locationRadius,
+      }
+    : cachedLocation;
 
   useEffect(() => {
     refreshUser().catch(() => {});
@@ -18,22 +40,39 @@ export default function MyPage() {
     navigate("/");
   };
 
+  const handleDeleteAccount = async () => {
+    if (isDeletingAccount) return;
+
+    setIsDeletingAccount(true);
+    try {
+      await membersApi.deleteAccount();
+      toast.success("회원탈퇴가 완료됐어요.");
+      await logout();
+      navigate("/", { replace: true });
+    } catch (error) {
+      console.error("Delete account failed", error);
+      toast.error("회원탈퇴를 완료하지 못했어요. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-transparent pb-20">
-      <header className="border-b border-gray-200 px-4 py-4">
-        <div className="flex items-center justify-between gap-3">
+      <header className="border-b border-orange-100 bg-white/78 px-3 py-4 backdrop-blur-xl sm:px-4">
+        <div className="flex flex-row-reverse items-center justify-end gap-4">
           <h1 className="text-lg font-medium">마이페이지</h1>
           <button
             type="button"
             onClick={() => navigate("/")}
-            className="btn-interactive flex items-center justify-center rounded-full border border-orange-100 bg-white p-2 shadow-sm"
+            className="btn-interactive flex shrink-0 items-center justify-center"
             aria-label="홈으로 이동"
           >
-            <div className="flex size-10 items-center justify-center overflow-hidden rounded-[1.1rem] bg-[radial-gradient(circle_at_top,#fff7ee,#ffe8cc_62%,#ffc98b)] ring-1 ring-orange-100/70">
+            <div className="flex size-[4.1rem] items-center justify-center overflow-hidden rounded-[1.4rem] bg-[radial-gradient(circle_at_top,#fff7ee,#ffe8cc_62%,#ffc98b)] shadow-[0_14px_24px_rgba(255,138,61,0.17)] ring-1 ring-orange-100/70">
               <img
                 src={foxHeadImage}
                 alt="Get-chu"
-                className="h-full w-full object-contain object-center mix-blend-multiply saturate-[1.05] contrast-[1.01]"
+                className="h-full w-full -translate-x-[8%] scale-[0.7] object-contain object-center mix-blend-multiply saturate-[1.05] contrast-[1.01] drop-shadow-[0_8px_14px_rgba(255,138,61,0.1)]"
               />
             </div>
           </button>
@@ -69,6 +108,24 @@ export default function MyPage() {
         <Button variant="outline" className="w-full border-gray-300" onClick={() => navigate("/my/profile/edit")}>
           프로필 수정
         </Button>
+
+        <Button
+          variant="outline"
+          className="mt-3 w-full border-orange-200 bg-orange-50/70 text-[var(--getchu-orange-strong)] hover:bg-orange-100"
+          onClick={() => navigate("/location/verify")}
+        >
+          <MapPin className="h-4 w-4" />
+          {verifiedLocation ? "동네 다시 인증하기" : "동네 인증하기"}
+        </Button>
+        {verifiedLocation ? (
+          <div className="mt-3 rounded-[1.2rem] border border-orange-100 bg-white px-4 py-3 text-sm text-gray-700">
+            <div className="flex items-center gap-2 font-semibold text-[var(--getchu-orange-strong)]">
+              <MapPin className="h-4 w-4" />
+              인증된 동네
+            </div>
+            <p className="mt-1 font-bold text-gray-950">{verifiedLocation.locationName}</p>
+          </div>
+        ) : null}
       </div>
 
       <div className="border-t border-gray-200 py-2">
@@ -144,6 +201,51 @@ export default function MyPage() {
         <Button onClick={handleLogout} variant="outline" className="w-full border-gray-300 text-gray-700">
           로그아웃
         </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-red-100 bg-red-50/40 text-red-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+            >
+              <Trash2 className="h-4 w-4" />
+              회원탈퇴
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent className="rounded-[1.75rem] border-orange-100 bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.16)]">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-xl font-bold text-gray-950">정말 떠나시겠어요?</AlertDialogTitle>
+              <AlertDialogDescription className="leading-6 text-gray-600">
+                탈퇴하면 현재 계정으로 다시 로그인할 수 없어요. 판매글, 찜, 채팅 등 계정과 연결된 정보에도 영향을 줄 수 있어요.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="rounded-[1.25rem] border border-orange-100 bg-orange-50/60 px-4 py-3 text-sm text-[var(--getchu-orange-strong)]">
+              잠깐만요. 실수로 누른 거라면 취소를 눌러주세요.
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeletingAccount} className="rounded-full">
+                취소
+              </AlertDialogCancel>
+              <AlertDialogAction
+                disabled={isDeletingAccount}
+                onClick={(event) => {
+                  event.preventDefault();
+                  handleDeleteAccount();
+                }}
+                className="rounded-full bg-red-500 text-white hover:bg-red-600"
+              >
+                {isDeletingAccount ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    탈퇴 처리 중
+                  </>
+                ) : (
+                  "회원탈퇴"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       <nav className="fixed bottom-0 left-0 right-0 border-t border-orange-100 bg-white/90 backdrop-blur-xl md:hidden">

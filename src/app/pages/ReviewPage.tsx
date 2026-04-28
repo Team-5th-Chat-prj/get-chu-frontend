@@ -48,6 +48,7 @@ function HalfStar({
   return (
     <button
       ref={ref}
+      data-testid={`review-star-${index}`}
       onMouseMove={handleMouseMove}
       onMouseLeave={() => onHover(0)}
       onClick={handleClick}
@@ -161,6 +162,7 @@ export default function ReviewPage() {
         <div>
           <h3 className="text-sm mb-2">상세 후기 (최대 500자)</h3>
           <Textarea
+            data-testid="review-content-input"
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="거래 경험을 공유해주세요"
@@ -173,6 +175,7 @@ export default function ReviewPage() {
         <Button
           onClick={handleSubmit}
           disabled={isLoading}
+          data-testid="review-submit-button"
           className="w-full bg-[var(--getchu-orange)] hover:bg-[var(--getchu-orange-strong)]"
         >
           {isLoading ? "등록 중..." : "리뷰 등록"}

@@ -11,10 +11,14 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
+import foxHeadImage from "../../assets/logo-fox-head.png";
 import { membersApi } from "../api/members";
 import { productsApi } from "../api/products";
 import { tradesApi } from "../api/trades";
 import { Button } from "../components/ui/button";
+import EmptyState from "../components/ui/state/EmptyState";
+import ErrorState from "../components/ui/state/ErrorState";
+import ListLoadingState from "../components/ui/state/ListLoadingState";
 import { useAuth } from "../contexts/AuthContext";
 import { ProductSummary, Trade, TradeStatus } from "../types";
 
@@ -66,6 +70,7 @@ export default function MyProductsPage() {
   const [activeTab, setActiveTab] = useState<string>("SALE");
   const [products, setProducts] = useState<ProductWithTrade[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
   const [actionLoading, setActionLoading] = useState<number | null>(null);
 
   useEffect(() => {
@@ -78,6 +83,7 @@ export default function MyProductsPage() {
 
   const fetchData = async () => {
     setLoading(true);
+    setErrorMessage("");
 
     try {
       const [myProductsRes, trades] = await Promise.all([
@@ -94,6 +100,7 @@ export default function MyProductsPage() {
 
       setProducts(merged);
     } catch {
+      setErrorMessage("판매 목록을 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
       toast.error("판매 목록을 불러오지 못했어요.");
     } finally {
       setLoading(false);
@@ -223,6 +230,7 @@ export default function MyProductsPage() {
                 key={tab.key}
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
+                data-testid={`seller-products-tab-${tab.key}`}
                 className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                   activeTab === tab.key
                     ? "bg-[var(--getchu-orange)] text-white shadow-[0_12px_24px_rgba(249,115,22,0.22)]"
@@ -236,14 +244,23 @@ export default function MyProductsPage() {
 
           <div className="px-4 py-5 sm:px-6">
             {loading ? (
-              <div className="rounded-[26px] border border-dashed border-[var(--getchu-border)] bg-[var(--getchu-cream)]/60 px-6 py-16 text-center text-sm text-gray-500">
-                판매 목록을 불러오고 있어요.
-              </div>
+              <ListLoadingState title="정보를 불러오는 중이에요..." description="판매 목록을 정리하고 있어요." />
+            ) : errorMessage ? (
+              <ErrorState
+                title="판매 목록을 불러오지 못했어요"
+                description={errorMessage}
+                actionLabel="다시 불러오기"
+                onAction={fetchData}
+                mascotImage={foxHeadImage}
+              />
             ) : filteredProducts.length === 0 ? (
-              <div className="rounded-[26px] border border-dashed border-[var(--getchu-border)] bg-[var(--getchu-cream)]/60 px-6 py-16 text-center">
-                <Package2 className="mx-auto h-10 w-10 text-[var(--getchu-orange)]/70" />
-                <p className="mt-4 text-base font-medium text-gray-900">이 상태의 상품이 아직 없어요.</p>
-              </div>
+              <EmptyState
+                title={products.length === 0 ? "등록한 상품이 없어요" : "이 상태의 상품이 아직 없어요"}
+                description="상품을 등록하면 판매 목록에서 상태별로 확인할 수 있어요."
+                actionLabel="상품 등록하기"
+                onAction={() => navigate("/products/new")}
+                mascotImage={foxHeadImage}
+              />
             ) : (
               <div className="space-y-4">
                 {filteredProducts.map((product) => {
@@ -253,6 +270,7 @@ export default function MyProductsPage() {
                   return (
                     <article
                       key={product.id}
+                      data-testid={`seller-product-card-${product.id}`}
                       className="rounded-[28px] border border-[var(--getchu-border)] bg-white p-4 shadow-[0_12px_32px_rgba(148,163,184,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_42px_rgba(148,163,184,0.14)] sm:p-5"
                     >
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -326,6 +344,7 @@ export default function MyProductsPage() {
                                 type="button"
                                 disabled={actionLoading === product.tradeId}
                                 onClick={() => handleTradeStatus(product.tradeId!, "TRADING")}
+                                data-testid={`seller-confirm-trade-button-${product.id}`}
                                 className="w-full bg-[var(--getchu-orange)] hover:bg-[var(--getchu-orange-strong)]"
                               >
                                 거래 확정
@@ -335,6 +354,7 @@ export default function MyProductsPage() {
                                 variant="outline"
                                 disabled={actionLoading === product.tradeId}
                                 onClick={() => handleTradeStatus(product.tradeId!, "SALE")}
+                                data-testid={`seller-cancel-reserve-button-${product.id}`}
                                 className="w-full border-orange-200 text-[var(--getchu-orange-strong)]"
                               >
                                 예약 취소

@@ -11,6 +11,17 @@ export interface CursorResponse<T> {
   hasNext: boolean;
 }
 
+export interface PageResponse<T> {
+  content: T[];
+  totalElements?: number;
+  totalPages?: number;
+  number?: number;
+  size?: number;
+  first?: boolean;
+  last?: boolean;
+  empty?: boolean;
+}
+
 // ─── 상품 ────────────────────────────────────────────────
 // 백엔드 ProductEnum: SALE | RESERVED | SOLD_OUT
 export type ProductStatus = "SALE" | "RESERVED" | "SOLD_OUT";
@@ -26,6 +37,20 @@ export interface ProductSummary {
   createdAt: string;
 }
 
+export interface NearbyProduct {
+  id: number;
+  title: string;
+  price: number;
+  status: ProductStatus;
+  categoryName: string | null;
+  sellerNickname: string;
+  thumbnailUrl: string | null;
+  locationName: string | null;
+  lat: number | null;
+  lng: number | null;
+  distanceKm: number;
+}
+
 /** GET /products/:id 상세 응답 (ProductResponse) */
 export interface ProductDetail {
   id: number;
@@ -34,6 +59,7 @@ export interface ProductDetail {
   description: string;
   price: number;
   status: ProductStatus;
+  likeCount?: number;
   categoryName: string | null;
   sellerNickname: string;
   imageUrls: string[];
@@ -71,6 +97,10 @@ export interface Member {
   averageRating: number;
   reviewCount: number;
   createdAt?: string;
+  locationName?: string | null;
+  locationRadius?: number | null;
+  locationLat?: number | null;
+  locationLng?: number | null;
 }
 
 /** GET /members/:id (MemberProfileResponse) */
@@ -117,6 +147,11 @@ export interface TradeReserveResponse {
   productTitle: string;
   sellerNickname: string;
   buyerNickname: string;
+}
+
+export interface LocationVerifyResponse {
+  locationName: string;
+  locationRadius: number;
 }
 
 // ─── 채팅 ────────────────────────────────────────────────

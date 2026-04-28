@@ -272,6 +272,37 @@
     animation: bounce-soft 2.2s ease-in-out infinite;
   }
 
+  @keyframes state-fade-in {
+    0% {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes mascot-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+
+  .state-fade-in {
+    animation: state-fade-in 220ms ease-out both;
+  }
+
+  .mascot-float {
+    animation: mascot-float 3s ease-in-out infinite;
+  }
+
   .category-chip {
     padding: 0.7rem 1rem;
     border-radius: 999px;
